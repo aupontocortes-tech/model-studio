@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* Dark mode is the default */
+:root {
+  --bg: #0e1016;
+  --bg-deep: #08090d;
+  --ink: #f2f3f7;
+  --muted: #9a9dad;
+  --line: #252833;
+  --panel: #16181f;
+  --panel-elevated: #1c1f28;
+  --accent: #7c5cff;
+  --accent-hover: #9075ff;
+  --accent-2: #ff6b45;
+  --accent-soft: rgba(124, 92, 255, 0.14);
+  --danger: #f04438;
+  --ok: #12b76a;
+  --sidebar: #0b0c10;
+  --sidebar-text: #f8f8fb;
+  --sidebar-muted: #7a7d8c;
+  --input-bg: #12141b;
+  --success-bg: rgba(18, 183, 106, 0.12);
+  --success-text: #6ce9a6;
+  --info-bg: rgba(124, 92, 255, 0.12);
+  --info-text: #c4b5fd;
+}
+
+:root.light {
+  --bg: #f6f7fb;
+  --bg-deep: #eef0f6;
+  --ink: #11131a;
+  --muted: #6f7280;
+  --line: #e2e4eb;
+  --panel: #ffffff;
+  --panel-elevated: #fafafe;
+  --accent: #6d4aff;
+  --accent-hover: #5e3ce8;
+  --accent-2: #ff6b45;
+  --accent-soft: #eeeaff;
+  --danger: #d92d20;
+  --ok: #079455;
+  --sidebar: #11131a;
+  --sidebar-text: #f8f8fb;
+  --sidebar-muted: #9295a3;
+  --input-bg: #ffffff;
+  --success-bg: #ecfdf3;
+  --success-text: #027a48;
+  --info-bg: #eeeaff;
+  --info-text: #4930b5;
+}
+
+@theme inline {
+  --font-sans: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: Inter, "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: var(--bg);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-panel: var(--panel);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--accent);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #3a3d4a;
+  background-clip: padding-box;
+}
+
+:root.light ::-webkit-scrollbar-thumb {
+  background: #c8cad3;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.subtle-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

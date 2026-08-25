@@ -1,0 +1,15 @@
+---
+description: Model Studeo — Fluxo UGC, Claude, DICloak, Flow/Veo3, Kalodata
+alwaysApply: true
+---
+
+# Model Studeo
+
+App Next.js em `http://127.0.0.1:3000`. Monta prompts (avatar + roupa + takes 8s); execução de vídeo/imagem em **Google Flow/Veo3**, pesquisa em **Kalodata**, via DICloak ou briefing para Claude.
+
+- Modo padrão: `AI_PROVIDER=prompt-only` (só prompts; botões copiar + `/api/claude-brief`).
+- Flow real: `https://flow.google/` (não landing labs.google de marketing).
+- Claude: `CLAUDE.md` + Configurações “Copiar prompt mestre” / Criar “Copiar briefing Claude”.
+- DICloak opcional: `DICLOAK_API_*` + MCP `dicloak-local-api-mcp-bridge`.
+- Não commitir `.env.local` / secrets.
+- Priorizar fidelidade da roupa e lock de identidade no `PromptEngine`.
