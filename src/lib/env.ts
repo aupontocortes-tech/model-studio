@@ -1,6 +1,14 @@
 import path from "path";
 
 export function getEnv() {
+  const onVercel = Boolean(process.env.VERCEL);
+  const dataDir = onVercel
+    ? path.join("/tmp", "model-studeo-data")
+    : path.resolve(process.cwd(), process.env.DATA_DIR || "data");
+  const uploadDir = onVercel
+    ? path.join("/tmp", "model-studeo-uploads")
+    : path.resolve(process.cwd(), process.env.UPLOAD_DIR || "uploads");
+
   return {
     aiProvider: (process.env.AI_PROVIDER || "mock").toLowerCase(),
     browserAgentMode: (process.env.BROWSER_AGENT_MODE || "assisted").toLowerCase(),
@@ -8,8 +16,8 @@ export function getEnv() {
       process.env.GOOGLE_FLOW_URL || "https://flow.google/",
     kalodataUrl: process.env.KALODATA_URL || "https://www.kalodata.com/",
     maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 8_388_608),
-    dataDir: path.resolve(process.cwd(), process.env.DATA_DIR || "data"),
-    uploadDir: path.resolve(process.cwd(), process.env.UPLOAD_DIR || "uploads"),
+    dataDir,
+    uploadDir,
     dicloakApiUrl: (
       process.env.DICLOAK_API_URL ||
       process.env.DICLOAK_BASE_URL ||

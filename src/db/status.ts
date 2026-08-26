@@ -26,8 +26,23 @@ export function sanitizeDatabaseUrl(raw: string): string | null {
   ) {
     url = url.slice(1, -1).trim();
   }
-  if (!url || url.includes("user:pass@host")) return null;
+  if (!url || /user:pass@host/i.test(url)) return null;
   if (!/^postgres(ql)?:\/\//i.test(url)) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (
+      !host ||
+      host === "host" ||
+      host === "localhost" ||
+      host === "example.com" ||
+      host === "xxx"
+    ) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
   return url;
 }
 
@@ -47,14 +62,19 @@ export function getDatabaseStatus(): {
   mode: "neon" | "local-json";
   host?: string | null;
 } {
+  const raw = process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim();
   const url = requireDatabaseUrlOrNull();
   if (!url) {
+    const looksPlaceholder =
+      raw &&
+      (/@HOST[/:]/i.test(raw) || /user:pass@host/i.test(raw) || /@host[/:]/i.test(raw));
     return {
       configured: false,
       mode: "local-json",
       host: null,
-      message:
-        "DATABASE_URL não configurada. Persistência ativa em JSON local (/data). Para Neon/PostgreSQL, defina DATABASE_URL no .env.local / Vercel.",
+      message: looksPlaceholder
+        ? "DATABASE_URL na Vercel ainda é placeholder (host HOST). Cole a connection string real do Neon (Connect → Connection string, com -pooler)."
+        : "DATABASE_URL não configurada. Persistência ativa em JSON local (/data). Para Neon/PostgreSQL, defina DATABASE_URL no .env.local / Vercel.",
     };
   }
   const host = databaseUrlHost(url);
