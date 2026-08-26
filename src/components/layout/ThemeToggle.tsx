@@ -6,11 +6,11 @@ import { useEffect, useState } from "react";
 const STORAGE_KEY = "model-studeo-theme";
 
 export function ThemeToggle() {
-  const [light, setLight] = useState(false);
+  const [light, setLight] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    const isLight = saved === "light";
+    const isLight = saved !== "dark";
     setLight(isLight);
     document.documentElement.classList.toggle("light", isLight);
   }, []);

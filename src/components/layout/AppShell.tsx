@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="relative z-20 border-b border-white/10 bg-[var(--sidebar)] text-[var(--sidebar-text)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r">
+      <aside className="relative z-20 border-b border-[var(--sidebar-edge)] bg-[var(--sidebar)] text-[var(--sidebar-text)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between px-5 py-5 lg:px-6 lg:py-7">
           <Link href="/" className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] shadow-[0_8px_20px_rgba(109,74,255,0.35)]">
@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href="/gerar"
             aria-label="Criar"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white lg:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--sidebar-hover)] text-[var(--sidebar-text)] lg:hidden"
           >
             <Plus size={18} />
           </Link>
@@ -95,14 +95,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 className={`group flex items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium transition ${
                   active
-                    ? "bg-white/[0.09] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)]"
-                    : "text-[var(--sidebar-muted)] hover:bg-white/[0.05] hover:text-white"
+                    ? "bg-[var(--sidebar-active)] text-[var(--sidebar-active-ink)]"
+                    : "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
                 }`}
               >
                 <Icon
                   size={18}
                   strokeWidth={active ? 2.2 : 1.8}
-                  className={active ? "text-[#a995ff]" : "transition group-hover:text-white"}
+                  className={
+                    active
+                      ? "text-[var(--sidebar-icon)]"
+                      : "transition group-hover:text-[var(--sidebar-text)]"
+                  }
                 />
                 {item.label}
               </Link>
@@ -110,10 +114,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="mt-auto hidden p-4 lg:block">
-          <div className="rounded-2xl border border-white/[0.07] bg-white/[0.04] p-3.5">
+          <div className="rounded-2xl border border-[var(--sidebar-card-line)] bg-[var(--sidebar-card)] p-3.5">
             <div className="flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.1)]" />
-              <span className="text-xs font-semibold text-white">{providerLabel}</span>
+              <span className="text-xs font-semibold text-[var(--sidebar-text)]">{providerLabel}</span>
             </div>
             <p className="mt-2 text-[11px] leading-4 text-[var(--sidebar-muted)]">
               Fidelidade do produto sempre tem prioridade.
@@ -123,8 +127,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href="/configuracoes"
             className={`mt-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
               pathname.startsWith("/configuracoes")
-                ? "bg-white/[0.09] text-white"
-                : "text-[var(--sidebar-muted)] hover:bg-white/[0.05] hover:text-white"
+                ? "bg-[var(--sidebar-active)] text-[var(--sidebar-active-ink)]"
+                : "text-[var(--sidebar-muted)] hover:bg-[var(--sidebar-hover)] hover:text-[var(--sidebar-text)]"
             }`}
           >
             <Settings2 size={18} />

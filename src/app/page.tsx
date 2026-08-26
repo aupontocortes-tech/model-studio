@@ -86,18 +86,18 @@ export default function DashboardPage() {
         subtitle="Studio criativo: identidade fixa + prompts para Flow/Veo · e o fluxo UGC de produto."
       />
 
-      <section className="relative mb-5 overflow-hidden rounded-3xl bg-[#171922] px-6 py-7 text-white shadow-[0_24px_60px_rgba(17,19,26,0.12)] sm:px-8 sm:py-9">
-        <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-[var(--accent)] opacity-30 blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 h-24 w-24 rounded-full bg-[#ff6b45] opacity-20 blur-2xl" />
+      <section className="relative mb-5 overflow-hidden rounded-3xl bg-[var(--panel)] px-6 py-7 text-[var(--ink)] shadow-[0_24px_60px_rgba(17,19,26,0.08)] ring-1 ring-[var(--line)] sm:px-8 sm:py-9">
+        <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-[var(--accent)] opacity-20 blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 h-24 w-24 rounded-full bg-[#ff6b45] opacity-15 blur-2xl" />
         <div className="relative z-10 max-w-xl">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-3 py-1.5 text-[11px] font-semibold text-white/80">
-            <Sparkles size={13} className="text-[#b7a8ff]" />
+          <span className="inline-flex items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel-elevated)] px-3 py-1.5 text-[11px] font-semibold text-[var(--muted)]">
+            <Sparkles size={13} className="text-[var(--accent)]" />
             MODEL STUDEO
           </span>
           <h2 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.045em] sm:text-[40px]">
             Personagem travada. Cena livre.
           </h2>
-          <p className="mt-3 max-w-lg text-sm leading-6 text-white/55">
+          <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">
             Cadastre identidade (rosto, cabelo, olhos, pele, corpo, personalidade),
             combine roupa/cenário/movimento/roteiro e gere o prompt de diretor
             criativo — sem reinventar o rosto.
@@ -113,16 +113,16 @@ export default function DashboardPage() {
             </Link>
             <Link
               href="/criar"
-              className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white/90"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-5 text-sm font-semibold text-[var(--ink)]"
             >
               Fluxo UGC (avatar + roupa)
             </Link>
           </div>
         </div>
-        <div className="absolute bottom-7 right-8 hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur lg:block">
-          <LockKeyhole size={20} className="text-[#a995ff]" />
+        <div className="absolute bottom-7 right-8 hidden rounded-2xl border border-[var(--line)] bg-[var(--panel-elevated)] p-4 backdrop-blur lg:block">
+          <LockKeyhole size={20} className="text-[var(--accent)]" />
           <p className="mt-3 text-xs font-semibold">Product Lock</p>
-          <p className="mt-1 max-w-[180px] text-[11px] leading-4 text-white/45">
+          <p className="mt-1 max-w-[180px] text-[11px] leading-4 text-[var(--muted)]">
             Cor, corte, textura e detalhes sempre preservados.
           </p>
         </div>

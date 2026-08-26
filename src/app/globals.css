@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Dark mode is the default */
+/* Dark is opt-in; light is the default */
 :root {
   --bg: #0e1016;
   --bg-deep: #08090d;
@@ -18,6 +18,13 @@
   --sidebar: #0b0c10;
   --sidebar-text: #f8f8fb;
   --sidebar-muted: #7a7d8c;
+  --sidebar-hover: rgba(255, 255, 255, 0.05);
+  --sidebar-active: rgba(255, 255, 255, 0.09);
+  --sidebar-active-ink: #ffffff;
+  --sidebar-icon: #a995ff;
+  --sidebar-card: rgba(255, 255, 255, 0.04);
+  --sidebar-card-line: rgba(255, 255, 255, 0.07);
+  --sidebar-edge: rgba(255, 255, 255, 0.1);
   --input-bg: #12141b;
   --success-bg: rgba(18, 183, 106, 0.12);
   --success-text: #6ce9a6;
@@ -39,9 +46,16 @@
   --accent-soft: #eeeaff;
   --danger: #d92d20;
   --ok: #079455;
-  --sidebar: #11131a;
-  --sidebar-text: #f8f8fb;
-  --sidebar-muted: #9295a3;
+  --sidebar: #ffffff;
+  --sidebar-text: #11131a;
+  --sidebar-muted: #6f7280;
+  --sidebar-hover: #f3f1ff;
+  --sidebar-active: #eeeaff;
+  --sidebar-active-ink: #11131a;
+  --sidebar-icon: #6d4aff;
+  --sidebar-card: #f6f7fb;
+  --sidebar-card-line: #e2e4eb;
+  --sidebar-edge: #e2e4eb;
   --input-bg: #ffffff;
   --success-bg: #ecfdf3;
   --success-text: #027a48;

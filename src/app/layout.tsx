@@ -14,11 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className="light" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('model-studeo-theme');if(t==='light')document.documentElement.classList.add('light')}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('model-studeo-theme');if(t==='dark')document.documentElement.classList.remove('light');else document.documentElement.classList.add('light')}catch(e){}})();`,
           }}
         />
       </head>
