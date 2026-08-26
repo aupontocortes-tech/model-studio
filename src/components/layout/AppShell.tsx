@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  Boxes,
-  Clock3,
-  FolderKanban,
+  Clapperboard,
   LayoutDashboard,
   Plus,
   Settings2,
@@ -17,13 +15,24 @@ import { api } from "@/lib/clientApi";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 const NAV = [
-  { href: "/", label: "Visão geral", icon: LayoutDashboard },
-  { href: "/criar", label: "Fazer vídeo", icon: Sparkles },
-  { href: "/produtos", label: "Produtos", icon: Boxes },
-  { href: "/modelos", label: "Modelos", icon: UserRound },
-  { href: "/projetos", label: "Projetos", icon: FolderKanban },
-  { href: "/historico", label: "Histórico", icon: Clock3 },
+  { href: "/gerar", label: "Criar", icon: Sparkles },
+  { href: "/personagens", label: "Biblioteca", icon: UserRound },
+  { href: "/criar", label: "UGC vídeo", icon: Clapperboard },
+  { href: "/", label: "Início", icon: LayoutDashboard },
+  { href: "/configuracoes", label: "Ajustes", icon: Settings2 },
 ];
+
+function navActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  if (href === "/personagens") {
+    return (
+      pathname.startsWith("/personagens") ||
+      pathname.startsWith("/roupas") ||
+      pathname.startsWith("/cenarios")
+    );
+  }
+  return pathname.startsWith(href);
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -60,8 +69,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
           <Link
-            href="/criar"
-            aria-label="Criar conteúdo"
+            href="/gerar"
+            aria-label="Criar"
             className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white lg:hidden"
           >
             <Plus size={18} />
@@ -69,7 +78,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
         <div className="hidden px-4 lg:block">
           <Link
-            href="/criar"
+            href="/gerar"
             className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--accent)] text-sm font-semibold text-white shadow-[0_8px_24px_rgba(109,74,255,0.28)] transition hover:bg-[var(--accent-hover)]"
           >
             <Plus size={17} strokeWidth={2.5} />
@@ -79,10 +88,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="flex gap-1 overflow-x-auto px-3 pb-4 lg:mt-7 lg:flex-col lg:overflow-visible lg:px-4">
           {NAV.map((item) => {
             const Icon = item.icon;
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+            const active = navActive(pathname, item.href);
             return (
               <Link
                 key={item.href}

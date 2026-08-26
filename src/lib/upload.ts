@@ -40,6 +40,40 @@ export function validateUpload(file: {
   return { ok: true };
 }
 
+const AUDIO_MIME = new Set([
+  "audio/mpeg",
+  "audio/mp3",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/m4a",
+  "audio/aac",
+]);
+const AUDIO_EXT = new Set([".mp3", ".wav", ".webm", ".ogg", ".m4a", ".aac"]);
+
+export function validateAudioUpload(file: {
+  name: string;
+  type: string;
+  size: number;
+}): { ok: true } | { ok: false; error: string } {
+  const { maxUploadBytes } = getEnv();
+  const ext = file.name.includes(".")
+    ? `.${file.name.split(".").pop()!.toLowerCase()}`
+    : "";
+  if (!AUDIO_MIME.has(file.type.toLowerCase()) && !AUDIO_EXT.has(ext)) {
+    return { ok: false, error: "Áudio inválido. Use MP3, WAV, M4A, OGG ou WEBM." };
+  }
+  if (file.size <= 0 || file.size > maxUploadBytes) {
+    return {
+      ok: false,
+      error: `Áudio deve ter até ${Math.round(maxUploadBytes / (1024 * 1024))}MB.`,
+    };
+  }
+  return { ok: true };
+}
+
 export function safeFilename(original: string): string {
   const cleaned = original
     .toLowerCase()

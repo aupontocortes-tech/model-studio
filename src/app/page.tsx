@@ -83,7 +83,7 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title="Visão geral"
-        subtitle="Foto da avatar + produto (ou Kalodata) → o agente faz o vídeo."
+        subtitle="Studio criativo: identidade fixa + prompts para Flow/Veo · e o fluxo UGC de produto."
       />
 
       <section className="relative mb-5 overflow-hidden rounded-3xl bg-[#171922] px-6 py-7 text-white shadow-[0_24px_60px_rgba(17,19,26,0.12)] sm:px-8 sm:py-9">
@@ -95,20 +95,29 @@ export default function DashboardPage() {
             MODEL STUDEO
           </span>
           <h2 className="mt-5 text-3xl font-bold leading-tight tracking-[-0.045em] sm:text-[40px]">
-            Avatar + produto. O resto é automático.
+            Personagem travada. Cena livre.
           </h2>
           <p className="mt-3 max-w-lg text-sm leading-6 text-white/55">
-            Manda a foto da modelo, indica a roupa (suas fotos ou Kalodata) e
-            o agente monta o vídeo — inclusive se ela já estiver no cenário.
+            Cadastre identidade (rosto, cabelo, olhos, pele, corpo, personalidade),
+            combine roupa/cenário/movimento/roteiro e gere o prompt de diretor
+            criativo — sem reinventar o rosto.
           </p>
-          <Link
-            href="/criar"
-            className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(109,74,255,0.3)] transition hover:bg-[var(--accent-hover)]"
-          >
-            <ImagePlus size={17} />
-            Começar criação
-            <ArrowRight size={16} />
-          </Link>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/gerar"
+              className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--accent)] px-5 text-sm font-semibold text-white shadow-[0_10px_30px_rgba(109,74,255,0.3)] transition hover:bg-[var(--accent-hover)]"
+            >
+              <WandSparkles size={17} />
+              Abrir gerador
+              <ArrowRight size={16} />
+            </Link>
+            <Link
+              href="/criar"
+              className="inline-flex h-11 items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-white/90"
+            >
+              Fluxo UGC (avatar + roupa)
+            </Link>
+          </div>
         </div>
         <div className="absolute bottom-7 right-8 hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur lg:block">
           <LockKeyhole size={20} className="text-[#a995ff]" />

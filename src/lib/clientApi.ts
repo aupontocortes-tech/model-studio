@@ -188,7 +188,7 @@ export const api = {
         body: JSON.stringify(body),
       }).then((r) => parse<{ generation: Generation }>(r)),
   },
-  claudeBrief: (opts?: { generationId?: string; mode?: "pack" | "prompt" }) => {
+    claudeBrief: (opts?: { generationId?: string; mode?: "pack" | "prompt" }) => {
     const q = new URLSearchParams();
     if (opts?.generationId) q.set("generationId", opts.generationId);
     if (opts?.mode) q.set("mode", opts.mode);
@@ -205,5 +205,197 @@ export const api = {
         pack?: Record<string, unknown>;
       }>(r),
     );
+  },
+  studio: {
+    characters: {
+      list: () =>
+        fetch("/api/studio/characters").then((r) =>
+          parse<{ characters: import("@/domain/studioAssets").StudioCharacter[] }>(r),
+        ),
+      create: (body: Record<string, unknown>) =>
+        fetch("/api/studio/characters", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ character: import("@/domain/studioAssets").StudioCharacter }>(r),
+        ),
+      update: (id: string, body: Record<string, unknown>) =>
+        fetch(`/api/studio/characters/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ character: import("@/domain/studioAssets").StudioCharacter }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/characters/${id}`, { method: "DELETE" }).then((r) =>
+          parse<{ ok: boolean }>(r),
+        ),
+      get: (id: string) =>
+        fetch(`/api/studio/characters/${id}`).then((r) =>
+          parse<{ character: import("@/domain/studioAssets").StudioCharacter }>(
+            r,
+          ),
+        ),
+    },
+    outfits: {
+      list: () =>
+        fetch("/api/studio/outfits").then((r) =>
+          parse<{ outfits: import("@/domain/studioAssets").StudioOutfit[] }>(r),
+        ),
+      create: (body: Record<string, unknown>) =>
+        fetch("/api/studio/outfits", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ outfit: import("@/domain/studioAssets").StudioOutfit }>(r),
+        ),
+      update: (id: string, body: Record<string, unknown>) =>
+        fetch(`/api/studio/outfits/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ outfit: import("@/domain/studioAssets").StudioOutfit }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/outfits/${id}`, { method: "DELETE" }).then((r) =>
+          parse<{ ok: boolean }>(r),
+        ),
+      upload: async (file: File, opts?: { outfitId?: string; characterId?: string; name?: string; description?: string; slot?: "piece" | "worn" }) => {
+        const form = new FormData();
+        form.append("file", file);
+        if (opts?.outfitId) form.append("outfitId", opts.outfitId);
+        if (opts?.characterId) form.append("characterId", opts.characterId);
+        if (opts?.name) form.append("name", opts.name);
+        if (opts?.description) form.append("description", opts.description);
+        form.append("slot", opts?.slot || "piece");
+        return fetch("/api/studio/outfits/upload", {
+          method: "POST",
+          body: form,
+        }).then((r) =>
+          parse<{ outfit: import("@/domain/studioAssets").StudioOutfit; url: string }>(r),
+        );
+      },
+    },
+    scenes: {
+      list: () =>
+        fetch("/api/studio/scenes").then((r) =>
+          parse<{ scenes: import("@/domain/studioAssets").StudioScene[] }>(r),
+        ),
+      create: (body: Record<string, unknown>) =>
+        fetch("/api/studio/scenes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ scene: import("@/domain/studioAssets").StudioScene }>(r),
+        ),
+      update: (id: string, body: Record<string, unknown>) =>
+        fetch(`/api/studio/scenes/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ scene: import("@/domain/studioAssets").StudioScene }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/scenes/${id}`, { method: "DELETE" }).then((r) =>
+          parse<{ ok: boolean }>(r),
+        ),
+      upload: async (
+        file: File,
+        opts?: {
+          sceneId?: string;
+          characterId?: string;
+          name?: string;
+          description?: string;
+          slot?: "place" | "inScene";
+        },
+      ) => {
+        const form = new FormData();
+        form.append("file", file);
+        if (opts?.sceneId) form.append("sceneId", opts.sceneId);
+        if (opts?.characterId) form.append("characterId", opts.characterId);
+        if (opts?.name) form.append("name", opts.name);
+        if (opts?.description) form.append("description", opts.description);
+        form.append("slot", opts?.slot || "place");
+        return fetch("/api/studio/scenes/upload", {
+          method: "POST",
+          body: form,
+        }).then((r) =>
+          parse<{ scene: import("@/domain/studioAssets").StudioScene; url: string }>(
+            r,
+          ),
+        );
+      },
+    },
+    movements: {
+      list: () =>
+        fetch("/api/studio/movements").then((r) =>
+          parse<{ movements: import("@/domain/studioAssets").StudioMovement[] }>(
+            r,
+          ),
+        ),
+      create: (body: Record<string, unknown>) =>
+        fetch("/api/studio/movements", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ movement: import("@/domain/studioAssets").StudioMovement }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/movements/${id}`, { method: "DELETE" }).then((r) =>
+          parse<{ ok: boolean }>(r),
+        ),
+    },
+    scripts: {
+      list: () =>
+        fetch("/api/studio/scripts").then((r) =>
+          parse<{ scripts: import("@/domain/studioAssets").StudioScript[] }>(r),
+        ),
+      create: (body: Record<string, unknown>) =>
+        fetch("/api/studio/scripts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ script: import("@/domain/studioAssets").StudioScript }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/scripts/${id}`, { method: "DELETE" }).then((r) =>
+          parse<{ ok: boolean }>(r),
+        ),
+    },
+    prompts: {
+      list: () =>
+        fetch("/api/studio/generate-prompt").then((r) =>
+          parse<{ prompts: import("@/domain/studioAssets").SavedStudioPrompt[] }>(
+            r,
+          ),
+        ),
+      generate: (body: Record<string, unknown>) =>
+        fetch("/api/studio/generate-prompt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{
+            systemPrompt: string;
+            userPrompt: string;
+            fullPrompt: string;
+            characterId?: string;
+            saved?: import("@/domain/studioAssets").SavedStudioPrompt;
+            characterPreview: Record<string, string | undefined>;
+          }>(r),
+        ),
+    },
+    seed: () =>
+      fetch("/api/studio/seed", { method: "POST" }).then((r) =>
+        parse<{ message: string; projectId: string }>(r),
+      ),
   },
 };

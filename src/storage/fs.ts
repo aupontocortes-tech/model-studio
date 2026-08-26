@@ -10,24 +10,45 @@ export async function readJsonFile<T>(filename: string, fallback: T): Promise<T>
   const { dataDir } = getEnv();
   await ensureDir(dataDir);
   const full = path.join(dataDir, filename);
-  try {
-    const raw = await fs.readFile(full, "utf8");
-    if (!raw.trim()) {
-      await fs.writeFile(full, JSON.stringify(fallback, null, 2), "utf8");
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const raw = await fs.readFile(full, "utf8");
+      if (!raw.trim()) {
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 40 * (attempt + 1)));
+          continue;
+        }
+        return fallback;
+      }
+      return JSON.parse(raw) as T;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") {
+        await fs.writeFile(full, JSON.stringify(fallback, null, 2), "utf8");
+        return fallback;
+      }
+      if (attempt < 2) {
+        await new Promise((r) => setTimeout(r, 40 * (attempt + 1)));
+        continue;
+      }
       return fallback;
     }
-    return JSON.parse(raw) as T;
-  } catch {
-    await fs.writeFile(full, JSON.stringify(fallback, null, 2), "utf8");
-    return fallback;
   }
+  return fallback;
 }
 
 export async function writeJsonFile<T>(filename: string, data: T): Promise<void> {
   const { dataDir } = getEnv();
   await ensureDir(dataDir);
   const full = path.join(dataDir, filename);
-  await fs.writeFile(full, JSON.stringify(data, null, 2), "utf8");
+  const tmp = `${full}.${process.pid}.${Date.now()}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
+  try {
+    await fs.rename(tmp, full);
+  } catch {
+    await fs.copyFile(tmp, full);
+    await fs.unlink(tmp).catch(() => undefined);
+  }
 }
 
 export async function saveUploadBuffer(opts: {

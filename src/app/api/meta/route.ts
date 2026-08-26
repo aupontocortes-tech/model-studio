@@ -3,6 +3,7 @@ import { SCENE_PRESETS } from "@/domain/scenePresets";
 import { getEnv } from "@/lib/env";
 import { PIPELINE_STAGES, PIPELINE_LABELS } from "@/pipeline/stages";
 import { isDicloakConfigured, probeDicloak } from "@/services/browser-agent/dicloak";
+import { getDatabaseStatus } from "@/db/status";
 
 export async function GET() {
   const env = getEnv();
@@ -25,6 +26,8 @@ export async function GET() {
       ? "cdp"
       : "playwright";
 
+  const database = getDatabaseStatus();
+
   return jsonOk({
     provider: env.aiProvider,
     browserAgentMode: env.browserAgentMode,
@@ -32,6 +35,7 @@ export async function GET() {
     googleFlowUrl: env.googleFlowUrl,
     kalodataUrl: env.kalodataUrl,
     maxUploadBytes: env.maxUploadBytes,
+    database,
     dicloak: {
       configured: dicloakConfigured,
       apiUrl: env.dicloakApiUrl,
