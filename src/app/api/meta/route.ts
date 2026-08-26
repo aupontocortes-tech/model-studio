@@ -3,6 +3,7 @@ import { SCENE_PRESETS } from "@/domain/scenePresets";
 import { getEnv } from "@/lib/env";
 import { PIPELINE_STAGES, PIPELINE_LABELS } from "@/pipeline/stages";
 import { isDicloakConfigured, probeDicloak } from "@/services/browser-agent/dicloak";
+import { neonPing } from "@/db/neon";
 import { getDatabaseStatus } from "@/db/status";
 
 export async function GET() {
@@ -27,6 +28,7 @@ export async function GET() {
       : "playwright";
 
   const database = getDatabaseStatus();
+  const neon = database.configured ? await neonPing() : null;
 
   return jsonOk({
     provider: env.aiProvider,
@@ -35,7 +37,10 @@ export async function GET() {
     googleFlowUrl: env.googleFlowUrl,
     kalodataUrl: env.kalodataUrl,
     maxUploadBytes: env.maxUploadBytes,
-    database,
+    database: {
+      ...database,
+      ping: neon,
+    },
     dicloak: {
       configured: dicloakConfigured,
       apiUrl: env.dicloakApiUrl,
