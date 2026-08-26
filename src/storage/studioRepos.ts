@@ -6,6 +6,7 @@ import type {
   StudioScene,
   StudioScript,
 } from "@/domain/studioAssets";
+import { isNeonEnabled, neonReadCollection, neonWriteCollection } from "@/db/neon";
 import { readJsonFile, writeJsonFile } from "@/storage/fs";
 
 type Collection<T> = T[];
@@ -36,12 +37,21 @@ async function withFileLock<T>(file: string, fn: () => Promise<T>): Promise<T> {
 function makeRepo<T extends { id: string }>(file: string) {
   return {
     async all(): Promise<T[]> {
+      if (isNeonEnabled()) return neonReadCollection<T>(file);
       return withFileLock(file, () => readJsonFile<Collection<T>>(file, []));
     },
     async get(id: string): Promise<T | undefined> {
       return (await this.all()).find((x) => x.id === id);
     },
     async upsert(item: T): Promise<T> {
+      if (isNeonEnabled()) {
+        const items = await neonReadCollection<T>(file);
+        const idx = items.findIndex((x) => x.id === item.id);
+        if (idx >= 0) items[idx] = item;
+        else items.push(item);
+        await neonWriteCollection(file, items);
+        return item;
+      }
       return withFileLock(file, async () => {
         const items = await readJsonFile<Collection<T>>(file, []);
         const idx = items.findIndex((x) => x.id === item.id);
@@ -52,6 +62,14 @@ function makeRepo<T extends { id: string }>(file: string) {
       });
     },
     async remove(id: string): Promise<void> {
+      if (isNeonEnabled()) {
+        const items = await neonReadCollection<T>(file);
+        await neonWriteCollection(
+          file,
+          items.filter((x) => x.id !== id),
+        );
+        return;
+      }
       await withFileLock(file, async () => {
         const items = await readJsonFile<Collection<T>>(file, []);
         await writeJsonFile(

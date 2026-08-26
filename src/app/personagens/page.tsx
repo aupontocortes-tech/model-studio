@@ -337,11 +337,17 @@ export default function BibliotecaPersonagensPage() {
           )}
         </Panel>
 
+        {error && !selected ? (
+          <p className="mb-2 text-xs text-[var(--danger)] lg:col-span-2">{error}</p>
+        ) : null}
         {!selected ? (
           <Panel title="Selecione">
             <p className="text-sm text-[var(--muted)]">
               Escolha uma personagem à esquerda ou crie uma nova.
             </p>
+            {msg ? (
+              <p className="mt-2 text-xs text-[var(--success-text)]">{msg}</p>
+            ) : null}
           </Panel>
         ) : (
           <div className="space-y-4">

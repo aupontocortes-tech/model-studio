@@ -18,7 +18,8 @@ export function getDatabaseStatus(): {
   return {
     configured: true,
     mode: "neon",
-    message: "DATABASE_URL detectada. Schema Drizzle em src/db/schema.ts (migração pendente de ligação completa).",
+    message:
+      "DATABASE_URL detectada. Studio criativo persiste no Neon (PostgreSQL).",
   };
 }
 
