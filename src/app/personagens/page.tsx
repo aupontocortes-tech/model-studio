@@ -11,8 +11,9 @@ import {
 import { LibraryTabs } from "@/components/studio/LibraryTabs";
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
-import { FilePickButton } from "@/components/studio/FilePickButton";
+import { FilePickButton, PhotoPickSlot } from "@/components/studio/FilePickButton";
 import { api } from "@/lib/clientApi";
+import { prepareImageFile } from "@/lib/prepareImage";
 import {
   characterHasVoice,
   outfitLabel,
@@ -82,9 +83,40 @@ export default function BibliotecaPersonagensPage() {
       api.studio.scenes.list(),
     ]);
     if (cRes.status !== "fulfilled") throw cRes.reason;
-    setList(cRes.value.characters);
-    if (oRes.status === "fulfilled") setOutfits(oRes.value.outfits);
-    if (sRes.status === "fulfilled") setScenes(sRes.value.scenes);
+    setList((prev) =>
+      cRes.value.characters.map((incoming) => {
+        const old = prev.find((p) => p.id === incoming.id);
+        return {
+          ...incoming,
+          faceImageUrl: incoming.faceImageUrl || old?.faceImageUrl,
+          bodyImageUrl: incoming.bodyImageUrl || old?.bodyImageUrl,
+        };
+      }),
+    );
+    if (oRes.status === "fulfilled") {
+      setOutfits((prev) =>
+        oRes.value.outfits.map((incoming) => {
+          const old = prev.find((p) => p.id === incoming.id);
+          return {
+            ...incoming,
+            imageUrl: incoming.imageUrl || old?.imageUrl,
+            wornImageUrl: incoming.wornImageUrl || old?.wornImageUrl,
+          };
+        }),
+      );
+    }
+    if (sRes.status === "fulfilled") {
+      setScenes((prev) =>
+        sRes.value.scenes.map((incoming) => {
+          const old = prev.find((p) => p.id === incoming.id);
+          return {
+            ...incoming,
+            imageUrl: incoming.imageUrl || old?.imageUrl,
+            inSceneImageUrl: incoming.inSceneImageUrl || old?.inSceneImageUrl,
+          };
+        }),
+      );
+    }
     if (!selectedId && cRes.value.characters[0]) {
       setSelectedId(cRes.value.characters[0].id);
     }
@@ -118,12 +150,16 @@ export default function BibliotecaPersonagensPage() {
     setEditSceneName(scene?.name || "");
   }, [selectedSceneId, scenes]);
 
-  async function run(action: () => Promise<void>, ok?: string) {
+  async function run(
+    action: () => Promise<void>,
+    ok?: string,
+    opts?: { skipReload?: boolean },
+  ) {
     setBusy(true);
     setError("");
     try {
       await action();
-      await reload();
+      if (!opts?.skipReload) await reload();
       if (ok) setMsg(ok);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha");
@@ -167,9 +203,30 @@ export default function BibliotecaPersonagensPage() {
       setError("Escolha ou crie uma personagem antes de enviar a foto.");
       return;
     }
-    await run(async () => {
+    setBusy(true);
+    setError("");
+    setMsg(kind === "voice" ? "Enviando áudio…" : "Preparando foto…");
+    try {
+      const prepared =
+        kind === "voice" ? file : await prepareImageFile(file);
+      const preview =
+        kind === "face" || kind === "body"
+          ? URL.createObjectURL(prepared)
+          : "";
+      if (preview) {
+        setList((prev) =>
+          prev.map((c) =>
+            c.id === selectedId
+              ? kind === "face"
+                ? { ...c, faceImageUrl: preview }
+                : { ...c, bodyImageUrl: preview }
+              : c,
+          ),
+        );
+      }
+      setMsg("Enviando…");
       const fd = new FormData();
-      fd.set("file", file);
+      fd.set("file", prepared);
       fd.set("kind", kind);
       const res = await fetch(`/api/studio/characters/${selectedId}/upload`, {
         method: "POST",
@@ -181,7 +238,38 @@ export default function BibliotecaPersonagensPage() {
           (data as { error?: string }).error || `Upload falhou (${res.status})`,
         );
       }
-    }, kind === "face" ? "Foto do rosto ok." : kind === "body" ? "Foto do corpo ok." : "Áudio da voz ok.");
+      const character = (data as { character?: StudioCharacter }).character;
+      if (character) {
+        setList((prev) =>
+          prev.map((c) =>
+            c.id === character.id
+              ? {
+                  ...character,
+                  faceImageUrl:
+                    character.faceImageUrl ||
+                    (kind === "face" ? preview : "") ||
+                    c.faceImageUrl,
+                  bodyImageUrl:
+                    character.bodyImageUrl ||
+                    (kind === "body" ? preview : "") ||
+                    c.bodyImageUrl,
+                }
+              : c,
+          ),
+        );
+      }
+      setMsg(
+        kind === "face"
+          ? "Foto do rosto ok."
+          : kind === "body"
+            ? "Foto do corpo ok."
+            : "Áudio da voz ok.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha no envio da foto.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function addMovement() {
@@ -225,7 +313,8 @@ export default function BibliotecaPersonagensPage() {
     const slot = opts?.slot || "piece";
     const replaceId = opts?.replaceId;
     await run(async () => {
-      const { outfit } = await api.studio.outfits.upload(file, {
+      const prepared = await prepareImageFile(file);
+      const { outfit } = await api.studio.outfits.upload(prepared, {
         outfitId: replaceId,
         characterId: selectedId,
         slot,
@@ -278,7 +367,8 @@ export default function BibliotecaPersonagensPage() {
     const slot = opts?.slot || "place";
     const replaceId = opts?.replaceId;
     await run(async () => {
-      const { scene } = await api.studio.scenes.upload(file, {
+      const prepared = await prepareImageFile(file);
+      const { scene } = await api.studio.scenes.upload(prepared, {
         sceneId: replaceId,
         characterId: selectedId,
         slot,
@@ -371,26 +461,24 @@ export default function BibliotecaPersonagensPage() {
             </Panel>
 
             <Panel title="Fotos">
+              {error ? (
+                <p className="mb-3 text-xs text-[var(--danger)]">{error}</p>
+              ) : null}
+              {msg ? (
+                <p className="mb-3 text-xs text-[var(--success-text)]">{msg}</p>
+              ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <p className="mb-2 text-xs font-medium text-[var(--ink)]">
                     Foto do rosto
                   </p>
-                  {selected.faceImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selected.faceImageUrl}
-                      alt="Rosto"
-                      className="mb-2 aspect-square w-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="mb-2 flex aspect-square items-center justify-center rounded-xl border border-dashed border-[var(--line)] text-xs text-[var(--muted)]">
-                      Sem foto
-                    </div>
-                  )}
-                  <FilePickButton
-                    accept="image/*,.heic,.heif"
-                    label={selected.faceImageUrl ? "Trocar rosto" : "Enviar rosto"}
+                  <PhotoPickSlot
+                    src={selected.faceImageUrl}
+                    alt="Rosto"
+                    emptyLabel="Sem foto"
+                    buttonLabel={
+                      selected.faceImageUrl ? "Trocar rosto" : "Enviar rosto"
+                    }
                     disabled={busy}
                     onFile={(f) => void upload("face", f)}
                   />
@@ -399,21 +487,14 @@ export default function BibliotecaPersonagensPage() {
                   <p className="mb-2 text-xs font-medium text-[var(--ink)]">
                     Foto do corpo
                   </p>
-                  {selected.bodyImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selected.bodyImageUrl}
-                      alt="Corpo"
-                      className="mb-2 aspect-[3/4] w-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-[var(--line)] text-xs text-[var(--muted)]">
-                      Sem foto
-                    </div>
-                  )}
-                  <FilePickButton
-                    accept="image/*,.heic,.heif"
-                    label={selected.bodyImageUrl ? "Trocar corpo" : "Enviar corpo"}
+                  <PhotoPickSlot
+                    src={selected.bodyImageUrl}
+                    alt="Corpo"
+                    emptyLabel="Sem foto"
+                    aspectClass="aspect-[3/4]"
+                    buttonLabel={
+                      selected.bodyImageUrl ? "Trocar corpo" : "Enviar corpo"
+                    }
                     disabled={busy}
                     onFile={(f) => void upload("body", f)}
                   />
@@ -489,21 +570,12 @@ export default function BibliotecaPersonagensPage() {
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
                         Peça (roupa separada)
                       </p>
-                      {selectedLook.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedLook.imageUrl}
-                          alt="Peça"
-                          className="mb-2 aspect-[3/4] w-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-[var(--line)] text-[11px] text-[var(--muted)]">
-                          Sem foto da peça
-                        </div>
-                      )}
-                      <FilePickButton
-                        accept="image/*,.heic,.heif"
-                        label={
+                      <PhotoPickSlot
+                        src={selectedLook.imageUrl}
+                        alt="Peça"
+                        emptyLabel="Sem foto da peça"
+                        aspectClass="aspect-[3/4]"
+                        buttonLabel={
                           selectedLook.imageUrl ? "Trocar peça" : "Enviar peça"
                         }
                         disabled={busy}
@@ -519,21 +591,12 @@ export default function BibliotecaPersonagensPage() {
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
                         Ela vestida
                       </p>
-                      {selectedLook.wornImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedLook.wornImageUrl}
-                          alt="Ela vestida"
-                          className="mb-2 aspect-[3/4] w-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-[var(--line)] text-[11px] text-[var(--muted)]">
-                          Sem foto dela vestida
-                        </div>
-                      )}
-                      <FilePickButton
-                        accept="image/*,.heic,.heif"
-                        label={
+                      <PhotoPickSlot
+                        src={selectedLook.wornImageUrl}
+                        alt="Ela vestida"
+                        emptyLabel="Sem foto dela vestida"
+                        aspectClass="aspect-[3/4]"
+                        buttonLabel={
                           selectedLook.wornImageUrl
                             ? "Trocar vestida"
                             : "Enviar ela vestida"
@@ -747,21 +810,12 @@ export default function BibliotecaPersonagensPage() {
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
                         Lugar
                       </p>
-                      {selectedScene.imageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedScene.imageUrl}
-                          alt="Lugar"
-                          className="mb-2 aspect-[3/4] w-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-[var(--line)] text-[11px] text-[var(--muted)]">
-                          Sem foto do lugar
-                        </div>
-                      )}
-                      <FilePickButton
-                        accept="image/*,.heic,.heif"
-                        label={
+                      <PhotoPickSlot
+                        src={selectedScene.imageUrl}
+                        alt="Lugar"
+                        emptyLabel="Sem foto do lugar"
+                        aspectClass="aspect-[3/4]"
+                        buttonLabel={
                           selectedScene.imageUrl ? "Trocar lugar" : "Enviar lugar"
                         }
                         disabled={busy}
@@ -777,21 +831,12 @@ export default function BibliotecaPersonagensPage() {
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
                         Ela no cenário
                       </p>
-                      {selectedScene.inSceneImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedScene.inSceneImageUrl}
-                          alt="Ela no cenário"
-                          className="mb-2 aspect-[3/4] w-full rounded-lg object-cover"
-                        />
-                      ) : (
-                        <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-lg border border-dashed border-[var(--line)] text-[11px] text-[var(--muted)]">
-                          Sem foto dela no lugar
-                        </div>
-                      )}
-                      <FilePickButton
-                        accept="image/*,.heic,.heif"
-                        label={
+                      <PhotoPickSlot
+                        src={selectedScene.inSceneImageUrl}
+                        alt="Ela no cenário"
+                        emptyLabel="Sem foto dela no lugar"
+                        aspectClass="aspect-[3/4]"
+                        buttonLabel={
                           selectedScene.inSceneImageUrl
                             ? "Trocar ela no lugar"
                             : "Enviar ela no lugar"

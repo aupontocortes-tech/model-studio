@@ -7,6 +7,9 @@ import {
 } from "@/domain/studioAssets";
 import { studioCharacterRepo } from "@/storage/studioRepos";
 
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 type Ctx = { params: Promise<{ id: string }> };
 
 /** Upload face | body | voice para o banco da personagem */
@@ -51,6 +54,7 @@ export async function POST(request: Request, ctx: Ctx) {
       relativeDir: `studio-characters/${id}`,
       filename: safeFilename(filename),
       buffer,
+      mimeHint: file.type,
     });
 
     const base = normalizeStudioCharacter(existing);

@@ -12,8 +12,12 @@ import {
   studioOutfitRepo,
 } from "@/storage/studioRepos";
 
+export const maxDuration = 60;
+export const runtime = "nodejs";
+
 /** Cria ou atualiza uma roupa. slot=piece (peça) ou worn (ela vestida). */
 export async function POST(request: Request) {
+  try {
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File)) return jsonError("Foto é obrigatória.");
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
     relativeDir: `studio-outfits/${id}`,
     filename: safeFilename(filename),
     buffer,
+    mimeHint: file.type,
   });
 
   const now = nowIso();
@@ -86,4 +91,10 @@ export async function POST(request: Request) {
   }
 
   return jsonOk({ outfit, url: saved.publicUrl }, { status: existing ? 200 : 201 });
+  } catch (e) {
+    return jsonError(
+      e instanceof Error ? e.message : "Falha no upload da roupa.",
+      500,
+    );
+  }
 }

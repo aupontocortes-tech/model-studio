@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useRef } from "react";
 import { Upload } from "lucide-react";
 
-/** Seletor de arquivo confiável em mobile (label > input hidden+click). */
+const ACCEPT_IMAGE = "image/*,.heic,.heif,.jpg,.jpeg,.png,.webp";
+
+/** O input fica ligado ao rótulo — clicar no texto abre o seletor no PC e no celular. */
 export function FilePickButton({
   accept,
   label,
@@ -17,45 +18,89 @@ export function FilePickButton({
   onFile: (file: File) => void;
   className?: string;
 }) {
-  const id = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-
   return (
-    <div className={className}>
+    <label
+      className={`inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-4 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm ${
+        disabled ? "pointer-events-none opacity-50" : ""
+      } ${className}`}
+    >
+      <Upload size={14} />
+      {label}
       <input
-        id={id}
-        ref={inputRef}
         type="file"
         accept={accept}
-        className="absolute h-px w-px overflow-hidden whitespace-nowrap border-0 p-0 opacity-0"
-        style={{ clipPath: "inset(50%)" }}
-        tabIndex={-1}
+        disabled={disabled}
+        className="sr-only"
         onChange={(e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
           if (f) onFile(f);
         }}
       />
+    </label>
+  );
+}
+
+/** Quadro da foto inteiro é clicável — não só o botão embaixo. */
+export function PhotoPickSlot({
+  src,
+  alt,
+  emptyLabel,
+  buttonLabel,
+  aspectClass = "aspect-square",
+  disabled,
+  onFile,
+}: {
+  src?: string;
+  alt: string;
+  emptyLabel: string;
+  buttonLabel: string;
+  aspectClass?: string;
+  disabled?: boolean;
+  onFile: (file: File) => void;
+}) {
+  return (
+    <div>
       <label
-        htmlFor={id}
-        aria-disabled={disabled || undefined}
-        className={`inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-4 py-2 text-sm font-semibold text-[var(--ink)] shadow-sm transition hover:border-[var(--accent)] hover:bg-[var(--panel)] ${
-          disabled ? "pointer-events-none opacity-50" : ""
+        className={`relative mb-2 block overflow-hidden rounded-xl ${
+          disabled ? "pointer-events-none opacity-50" : "cursor-pointer"
         }`}
-        onClick={(e) => {
-          if (disabled) {
-            e.preventDefault();
-            return;
-          }
-          // Alguns WebViews ignoram htmlFor; reforça o open.
-          if (inputRef.current && e.target === e.currentTarget) {
-            // leave native label behavior
-          }
-        }}
       >
-        <Upload size={14} />
-        {label}
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={alt}
+            className={`${aspectClass} w-full bg-[var(--panel)] object-cover`}
+          />
+        ) : (
+          <div
+            className={`${aspectClass} flex w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--line)] bg-[var(--panel)] px-3 text-center text-xs text-[var(--muted)]`}
+          >
+            <Upload size={18} />
+            <span>{emptyLabel}</span>
+            <span className="text-[10px]">Toque para escolher a foto</span>
+          </div>
+        )}
+        <input
+          type="file"
+          accept={ACCEPT_IMAGE}
+          disabled={disabled}
+          aria-label={buttonLabel}
+          className="sr-only"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) onFile(f);
+          }}
+        />
       </label>
+      <FilePickButton
+        accept={ACCEPT_IMAGE}
+        label={buttonLabel}
+        disabled={disabled}
+        onFile={onFile}
+      />
     </div>
   );
 }

@@ -91,6 +91,36 @@ export function validateAudioUpload(file: {
   return { ok: true };
 }
 
+export function guessImageMime(filename: string, mimeHint?: string): string {
+  const hint = (mimeHint || "").toLowerCase();
+  if (hint.startsWith("image/") && hint !== "image/*") return hint;
+  const ext = filename.includes(".")
+    ? `.${filename.split(".").pop()!.toLowerCase()}`
+    : "";
+  const map: Record<string, string> = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+  };
+  return map[ext] || "image/jpeg";
+}
+
+/** Embeds the photo in the record so the UI does not depend on /api/files. */
+export function bufferToDataUrl(
+  buffer: Buffer,
+  filename: string,
+  mimeHint?: string,
+): string {
+  const mime = guessImageMime(filename, mimeHint);
+  return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
 export function safeFilename(original: string): string {
   const cleaned = original
     .toLowerCase()

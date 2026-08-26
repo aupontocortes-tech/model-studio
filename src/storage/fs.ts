@@ -1,29 +1,11 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getEnv } from "@/lib/env";
-import { isNeonEnabled, neonSaveFile } from "@/db/neon";
+import { isNeonEnabled } from "@/db/neon";
+import { bufferToDataUrl } from "@/lib/upload";
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
-}
-
-function guessContentType(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  const map: Record<string, string> = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-    ".heic": "image/heic",
-    ".heif": "image/heif",
-    ".mp3": "audio/mpeg",
-    ".wav": "audio/wav",
-    ".webm": "audio/webm",
-    ".ogg": "audio/ogg",
-    ".m4a": "audio/mp4",
-    ".aac": "audio/aac",
-  };
-  return map[ext] || "application/octet-stream";
 }
 
 export async function readJsonFile<T>(filename: string, fallback: T): Promise<T> {
@@ -75,25 +57,30 @@ export async function saveUploadBuffer(opts: {
   relativeDir: string;
   filename: string;
   buffer: Buffer;
+  mimeHint?: string;
 }): Promise<{ absolutePath: string; publicUrl: string }> {
   const relativePath = path
     .join(opts.relativeDir, opts.filename)
     .replace(/\\/g, "/");
-  const publicUrl = `/api/files/${relativePath}`;
+  // Data URL fica no JSON da personagem/look — aparece na tela sem depender de arquivo em disco.
+  const publicUrl = bufferToDataUrl(
+    opts.buffer,
+    opts.filename,
+    opts.mimeHint,
+  );
 
   if (isNeonEnabled()) {
-    await neonSaveFile({
-      relativePath,
-      buffer: opts.buffer,
-      contentType: guessContentType(opts.filename),
-    });
     return { absolutePath: relativePath, publicUrl };
   }
 
-  const { uploadDir } = getEnv();
-  const dir = path.join(uploadDir, opts.relativeDir);
-  await ensureDir(dir);
-  const absolutePath = path.join(dir, opts.filename);
-  await fs.writeFile(absolutePath, opts.buffer);
-  return { absolutePath, publicUrl };
+  try {
+    const { uploadDir } = getEnv();
+    const dir = path.join(uploadDir, opts.relativeDir);
+    await ensureDir(dir);
+    const absolutePath = path.join(dir, opts.filename);
+    await fs.writeFile(absolutePath, opts.buffer);
+    return { absolutePath, publicUrl };
+  } catch {
+    return { absolutePath: relativePath, publicUrl };
+  }
 }
