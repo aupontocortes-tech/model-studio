@@ -14,6 +14,8 @@ function guessContentType(filename: string): string {
     ".jpeg": "image/jpeg",
     ".png": "image/png",
     ".webp": "image/webp",
+    ".heic": "image/heic",
+    ".heif": "image/heif",
     ".mp3": "audio/mpeg",
     ".wav": "audio/wav",
     ".webm": "audio/webm",

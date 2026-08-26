@@ -11,6 +11,7 @@ import {
 import { LibraryTabs } from "@/components/studio/LibraryTabs";
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
+import { FilePickButton } from "@/components/studio/FilePickButton";
 import { api } from "@/lib/clientApi";
 import {
   characterHasVoice,
@@ -30,17 +31,7 @@ export default function BibliotecaPersonagensPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
-  const faceRef = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLInputElement>(null);
   const voiceRef = useRef<HTMLInputElement>(null);
-  const outfitFileRef = useRef<HTMLInputElement>(null);
-  const wornFileRef = useRef<HTMLInputElement>(null);
-  const replaceOutfitFileRef = useRef<HTMLInputElement>(null);
-  const replaceWornFileRef = useRef<HTMLInputElement>(null);
-  const scenePlaceRef = useRef<HTMLInputElement>(null);
-  const sceneInRef = useRef<HTMLInputElement>(null);
-  const replaceScenePlaceRef = useRef<HTMLInputElement>(null);
-  const replaceSceneInRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [identityPrompt, setIdentityPrompt] = useState("");
@@ -172,7 +163,10 @@ export default function BibliotecaPersonagensPage() {
   }
 
   async function upload(kind: "face" | "body" | "voice", file: File) {
-    if (!selectedId) return;
+    if (!selectedId) {
+      setError("Escolha ou crie uma personagem antes de enviar a foto.");
+      return;
+    }
     await run(async () => {
       const fd = new FormData();
       fd.set("file", file);
@@ -181,8 +175,12 @@ export default function BibliotecaPersonagensPage() {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload falhou");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (data as { error?: string }).error || `Upload falhou (${res.status})`,
+        );
+      }
     }, kind === "face" ? "Foto do rosto ok." : kind === "body" ? "Foto do corpo ok." : "Áudio da voz ok.");
   }
 
@@ -390,23 +388,12 @@ export default function BibliotecaPersonagensPage() {
                       Sem foto
                     </div>
                   )}
-                  <input
-                    ref={faceRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void upload("face", f);
-                    }}
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label={selected.faceImageUrl ? "Trocar rosto" : "Enviar rosto"}
+                    disabled={busy}
+                    onFile={(f) => void upload("face", f)}
                   />
-                  <Button
-                    variant="secondary"
-                    onClick={() => faceRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Enviar rosto
-                  </Button>
                 </div>
                 <div>
                   <p className="mb-2 text-xs font-medium text-[var(--ink)]">
@@ -424,23 +411,12 @@ export default function BibliotecaPersonagensPage() {
                       Sem foto
                     </div>
                   )}
-                  <input
-                    ref={bodyRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void upload("body", f);
-                    }}
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label={selected.bodyImageUrl ? "Trocar corpo" : "Enviar corpo"}
+                    disabled={busy}
+                    onFile={(f) => void upload("body", f)}
                   />
-                  <Button
-                    variant="secondary"
-                    onClick={() => bodyRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Enviar corpo
-                  </Button>
                 </div>
               </div>
             </Panel>
@@ -525,13 +501,19 @@ export default function BibliotecaPersonagensPage() {
                           Sem foto da peça
                         </div>
                       )}
-                      <Button
-                        variant="secondary"
-                        onClick={() => replaceOutfitFileRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        {selectedLook.imageUrl ? "Trocar peça" : "Enviar peça"}
-                      </Button>
+                      <FilePickButton
+                        accept="image/*,.heic,.heif"
+                        label={
+                          selectedLook.imageUrl ? "Trocar peça" : "Enviar peça"
+                        }
+                        disabled={busy}
+                        onFile={(f) =>
+                          void uploadOutfitPhoto(f, {
+                            replaceId: selectedLook.id,
+                            slot: "piece",
+                          })
+                        }
+                      />
                     </div>
                     <div>
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
@@ -549,15 +531,21 @@ export default function BibliotecaPersonagensPage() {
                           Sem foto dela vestida
                         </div>
                       )}
-                      <Button
-                        variant="secondary"
-                        onClick={() => replaceWornFileRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        {selectedLook.wornImageUrl
-                          ? "Trocar vestida"
-                          : "Enviar ela vestida"}
-                      </Button>
+                      <FilePickButton
+                        accept="image/*,.heic,.heif"
+                        label={
+                          selectedLook.wornImageUrl
+                            ? "Trocar vestida"
+                            : "Enviar ela vestida"
+                        }
+                        disabled={busy}
+                        onFile={(f) =>
+                          void uploadOutfitPhoto(f, {
+                            replaceId: selectedLook.id,
+                            slot: "worn",
+                          })
+                        }
+                      />
                     </div>
                   </div>
                   <input
@@ -578,38 +566,6 @@ export default function BibliotecaPersonagensPage() {
                   >
                     Salvar nome
                   </Button>
-                  <input
-                    ref={replaceOutfitFileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) {
-                        void uploadOutfitPhoto(f, {
-                          replaceId: selectedLook.id,
-                          slot: "piece",
-                        });
-                      }
-                    }}
-                  />
-                  <input
-                    ref={replaceWornFileRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) {
-                        void uploadOutfitPhoto(f, {
-                          replaceId: selectedLook.id,
-                          slot: "worn",
-                        });
-                      }
-                    }}
-                  />
                 </div>
               ) : null}
 
@@ -634,43 +590,19 @@ export default function BibliotecaPersonagensPage() {
                 <p className="text-xs font-medium text-[var(--ink)]">
                   Novo look
                 </p>
-                <input
-                  ref={outfitFileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) void uploadOutfitPhoto(f, { slot: "piece" });
-                  }}
-                />
-                <input
-                  ref={wornFileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) void uploadOutfitPhoto(f, { slot: "worn" });
-                  }}
-                />
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => outfitFileRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Foto da peça
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => wornFileRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Ela vestida
-                  </Button>
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label="Foto da peça"
+                    disabled={busy}
+                    onFile={(f) => void uploadOutfitPhoto(f, { slot: "piece" })}
+                  />
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label="Ela vestida"
+                    disabled={busy}
+                    onFile={(f) => void uploadOutfitPhoto(f, { slot: "worn" })}
+                  />
                 </div>
                 <input
                   className={inputClass}
@@ -827,13 +759,19 @@ export default function BibliotecaPersonagensPage() {
                           Sem foto do lugar
                         </div>
                       )}
-                      <Button
-                        variant="secondary"
-                        onClick={() => replaceScenePlaceRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        {selectedScene.imageUrl ? "Trocar lugar" : "Enviar lugar"}
-                      </Button>
+                      <FilePickButton
+                        accept="image/*,.heic,.heif"
+                        label={
+                          selectedScene.imageUrl ? "Trocar lugar" : "Enviar lugar"
+                        }
+                        disabled={busy}
+                        onFile={(f) =>
+                          void uploadScenePhoto(f, {
+                            replaceId: selectedScene.id,
+                            slot: "place",
+                          })
+                        }
+                      />
                     </div>
                     <div>
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
@@ -851,15 +789,21 @@ export default function BibliotecaPersonagensPage() {
                           Sem foto dela no lugar
                         </div>
                       )}
-                      <Button
-                        variant="secondary"
-                        onClick={() => replaceSceneInRef.current?.click()}
-                      >
-                        <Upload size={14} />
-                        {selectedScene.inSceneImageUrl
-                          ? "Trocar ela no lugar"
-                          : "Enviar ela no lugar"}
-                      </Button>
+                      <FilePickButton
+                        accept="image/*,.heic,.heif"
+                        label={
+                          selectedScene.inSceneImageUrl
+                            ? "Trocar ela no lugar"
+                            : "Enviar ela no lugar"
+                        }
+                        disabled={busy}
+                        onFile={(f) =>
+                          void uploadScenePhoto(f, {
+                            replaceId: selectedScene.id,
+                            slot: "inScene",
+                          })
+                        }
+                      />
                     </div>
                   </div>
                   <input
@@ -880,38 +824,6 @@ export default function BibliotecaPersonagensPage() {
                   >
                     Salvar nome
                   </Button>
-                  <input
-                    ref={replaceScenePlaceRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) {
-                        void uploadScenePhoto(f, {
-                          replaceId: selectedScene.id,
-                          slot: "place",
-                        });
-                      }
-                    }}
-                  />
-                  <input
-                    ref={replaceSceneInRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) {
-                        void uploadScenePhoto(f, {
-                          replaceId: selectedScene.id,
-                          slot: "inScene",
-                        });
-                      }
-                    }}
-                  />
                 </div>
               ) : null}
 
@@ -936,43 +848,19 @@ export default function BibliotecaPersonagensPage() {
                 <p className="text-xs font-medium text-[var(--ink)]">
                   Novo cenário
                 </p>
-                <input
-                  ref={scenePlaceRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) void uploadScenePhoto(f, { slot: "place" });
-                  }}
-                />
-                <input
-                  ref={sceneInRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) void uploadScenePhoto(f, { slot: "inScene" });
-                  }}
-                />
                 <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => scenePlaceRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Foto do lugar
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => sceneInRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    Ela no cenário
-                  </Button>
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label="Foto do lugar"
+                    disabled={busy}
+                    onFile={(f) => void uploadScenePhoto(f, { slot: "place" })}
+                  />
+                  <FilePickButton
+                    accept="image/*,.heic,.heif"
+                    label="Ela no cenário"
+                    disabled={busy}
+                    onFile={(f) => void uploadScenePhoto(f, { slot: "inScene" })}
+                  />
                 </div>
                 <input
                   className={inputClass}

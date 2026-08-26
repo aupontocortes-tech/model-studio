@@ -5,9 +5,20 @@ const ALLOWED_MIME = new Set([
   "image/jpg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/heic-sequence",
+  "image/heif-sequence",
 ]);
 
-const ALLOWED_EXT = new Set([".jpg", ".jpeg", ".png", ".webp"]);
+const ALLOWED_EXT = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".heic",
+  ".heif",
+]);
 
 export function validateUpload(file: {
   name: string;
@@ -19,14 +30,20 @@ export function validateUpload(file: {
     ? `.${file.name.split(".").pop()!.toLowerCase()}`
     : "";
   const mime = (file.type || "").toLowerCase();
-  const mimeOk = ALLOWED_MIME.has(mime);
+  const mimeOk = ALLOWED_MIME.has(mime) || mime.startsWith("image/");
   const extOk = ALLOWED_EXT.has(ext);
 
-  // Aceita se tiver MIME válido OU extensão válida (alguns apps mandam type vazio)
-  if (!mimeOk && !extOk) {
+  // Aceita MIME de imagem, extensão conhecida, ou type vazio (comum no iPhone)
+  if (!mimeOk && !extOk && mime !== "") {
     return {
       ok: false,
-      error: "Tipo de arquivo inválido. Use JPG, PNG ou WEBP.",
+      error: "Tipo de arquivo inválido. Use JPG, PNG, WEBP ou HEIC.",
+    };
+  }
+  if (!mimeOk && !extOk && mime === "" && !ext) {
+    return {
+      ok: false,
+      error: "Não deu para ler o tipo da imagem. Tente JPG ou PNG.",
     };
   }
 
