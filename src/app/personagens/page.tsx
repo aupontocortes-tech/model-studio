@@ -54,14 +54,19 @@ export default function BibliotecaPersonagensPage() {
   const [editSceneName, setEditSceneName] = useState("");
   const [newSceneName, setNewSceneName] = useState("");
   const [newScenePrompt, setNewScenePrompt] = useState("");
+  const [dragOutfitId, setDragOutfitId] = useState<string | null>(null);
+  const [dragOverOutfitId, setDragOverOutfitId] = useState<string | null>(null);
 
   const selected = list.find((c) => c.id === selectedId);
   const others = list.filter((c) => c.id !== selectedId);
 
-  const wardrobe = useMemo(
-    () => outfits.filter((o) => selected?.outfitIds.includes(o.id)),
-    [outfits, selected],
-  );
+  const wardrobe = useMemo(() => {
+    if (!selected) return [];
+    const byId = new Map(outfits.map((o) => [o.id, o]));
+    return selected.outfitIds
+      .map((id) => byId.get(id))
+      .filter((o): o is StudioOutfit => Boolean(o));
+  }, [outfits, selected]);
   const availableOutfits = useMemo(
     () => outfits.filter((o) => !selected?.outfitIds.includes(o.id)),
     [outfits, selected],
@@ -370,6 +375,29 @@ export default function BibliotecaPersonagensPage() {
     }, "Roupa copiada para a outra personagem.");
   }
 
+  async function reorderWardrobe(fromId: string, toId: string) {
+    if (!selectedId || !selected || fromId === toId) return;
+    const ids = [...selected.outfitIds];
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(toId);
+    if (from < 0 || to < 0) return;
+    ids.splice(from, 1);
+    ids.splice(to, 0, fromId);
+    setList((prev) =>
+      prev.map((c) => (c.id === selectedId ? { ...c, outfitIds: ids } : c)),
+    );
+    setDragOutfitId(null);
+    setDragOverOutfitId(null);
+    try {
+      await api.studio.characters.update(selectedId, { outfitIds: ids });
+      setMsg("Ordem dos looks salva.");
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao salvar a ordem.");
+      await reload().catch(() => undefined);
+    }
+  }
+
   async function attachScene(sceneId: string) {
     if (!selectedId || !sceneId) return;
     await run(async () => {
@@ -569,7 +597,7 @@ export default function BibliotecaPersonagensPage() {
 
             <Panel
               title="Looks dela"
-              description="Peça e ela vestida em miniaturas — clique para ampliar. Ao gerar still na Criação, a imagem vai para Ela vestida deste look."
+              description="Arraste e solte para reorganizar. Clique na foto para ampliar. Still da Criação vai para Ela vestida."
             >
               {wardrobe.length === 0 ? (
                 <p className="mb-3 text-sm text-[var(--muted)]">
@@ -583,6 +611,32 @@ export default function BibliotecaPersonagensPage() {
                       outfit={o}
                       selected={copyOutfitId === o.id}
                       onSelect={() => setCopyOutfitId(o.id)}
+                      draggable
+                      dragging={dragOutfitId === o.id}
+                      dragOver={dragOverOutfitId === o.id}
+                      onDragStart={(e) => {
+                        setDragOutfitId(o.id);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", o.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverOutfitId !== o.id) setDragOverOutfitId(o.id);
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverOutfitId === o.id) setDragOverOutfitId(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromId =
+                          e.dataTransfer.getData("text/plain") || dragOutfitId;
+                        if (fromId) void reorderWardrobe(fromId, o.id);
+                      }}
+                      onDragEnd={() => {
+                        setDragOutfitId(null);
+                        setDragOverOutfitId(null);
+                      }}
                       onRemove={() =>
                         void run(async () => {
                           await api.studio.characters.update(selectedId, {

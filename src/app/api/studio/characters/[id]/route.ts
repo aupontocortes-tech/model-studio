@@ -71,11 +71,25 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (typeof body.removeOutfitId === "string") {
     outfitIds = outfitIds.filter((x) => x !== body.removeOutfitId);
   }
+  if (Array.isArray(body.outfitIds)) {
+    outfitIds = uniqueIds(
+      body.outfitIds.filter(
+        (x): x is string => typeof x === "string" && x.trim().length > 0,
+      ),
+    );
+  }
   if (typeof body.addSceneId === "string" && body.addSceneId.trim()) {
     sceneIds = uniqueIds([...sceneIds, body.addSceneId.trim()]);
   }
   if (typeof body.removePinnedSceneId === "string") {
     sceneIds = sceneIds.filter((x) => x !== body.removePinnedSceneId);
+  }
+  if (Array.isArray(body.sceneIds)) {
+    sceneIds = uniqueIds(
+      body.sceneIds.filter(
+        (x): x is string => typeof x === "string" && x.trim().length > 0,
+      ),
+    );
   }
 
   let voice = base.voice || emptyVoice();

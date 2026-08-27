@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import { outfitLabel, type StudioOutfit } from "@/domain/studioAssets";
 import { ImageLightbox } from "@/components/studio/ImageLightbox";
 
@@ -52,11 +52,27 @@ export function OutfitCard({
   selected = false,
   onSelect,
   onRemove,
+  draggable = false,
+  dragging = false,
+  dragOver = false,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
 }: {
   outfit: StudioOutfit;
   selected?: boolean;
   onSelect?: () => void;
   onRemove?: () => void;
+  draggable?: boolean;
+  dragging?: boolean;
+  dragOver?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  onDragEnd?: (e: React.DragEvent) => void;
 }) {
   const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(
     null,
@@ -67,12 +83,29 @@ export function OutfitCard({
   return (
     <>
       <div
+        draggable={draggable}
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+        onDragEnd={onDragEnd}
         className={`relative overflow-hidden rounded-xl border text-left transition ${
           selected
             ? "border-[var(--accent)] ring-2 ring-[var(--accent-soft)]"
             : "border-[var(--line)] hover:border-[var(--accent)]"
-        }`}
+        } ${dragging ? "opacity-40" : ""} ${
+          dragOver ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : ""
+        } ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`}
       >
+        {draggable ? (
+          <span
+            className="absolute left-1 top-1 z-[1] rounded-md bg-black/45 p-0.5 text-white/90"
+            title="Arraste para reorganizar"
+            aria-hidden
+          >
+            <GripVertical size={12} />
+          </span>
+        ) : null}
         <button
           type="button"
           className="block w-full p-1.5"
