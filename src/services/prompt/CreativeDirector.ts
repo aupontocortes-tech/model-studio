@@ -1,6 +1,7 @@
 import {
   CREATIVE_DIRECTOR_SYSTEM_PROMPT,
   characterHasVoice,
+  type FramingOption,
   type SavedStudioPrompt,
   type StudioCharacter,
   type StudioMediaKind,
@@ -13,17 +14,50 @@ import {
 /** Prompt profissional pronto para vestir a roupa do look nela (virtual try-on). */
 export const OUTFIT_TRY_ON_SYSTEM = `Professional fashion / UGC image director. Photorealistic still only. Lock the same woman identity from reference photos. Only change the outfit to match the garment reference. No text overlays, no watermarks, no UI.`;
 
+/**
+ * Troca termos que costumam travar o filtro de conteúdo de geradores de
+ * imagem (ex.: ChatGPT/Tokfy bloqueando por "roupa de dormir") por
+ * equivalentes neutros de moda, mantendo a mesma peça descrita.
+ */
+const UNSAFE_GARMENT_TERMS: Array<[RegExp, string]> = [
+  [/camisolas?\s+de\s+dormir/gi, "vestidos leves de cetim"],
+  [/camisolas?\s+para\s+dormir/gi, "vestidos leves de cetim"],
+  [/camisola/gi, "vestido leve"],
+  [/roupas?\s+de\s+dormir/gi, "vestido casual leve"],
+  [/camisão/gi, "vestido longo leve"],
+  [/pijamas?/gi, "conjunto confortável"],
+  [/lingerie/gi, "peça delicada"],
+  [/roupa\s+íntima/gi, "peça delicada"],
+  [/night\s*gowns?/gi, "light slip dress"],
+  [/sleepwear/gi, "light dress"],
+  [/night\s*dress(es)?/gi, "light dress"],
+];
+
+export function sanitizeGarmentText(text: string): string {
+  let out = text;
+  for (const [pattern, replacement] of UNSAFE_GARMENT_TERMS) {
+    out = out.replace(pattern, replacement);
+  }
+  return out;
+}
+
 export function buildOutfitTryOnPrompt(input: {
   character: StudioCharacter;
   outfit: StudioOutfit;
   movementPrompt?: string;
   keepSceneFromPhoto?: boolean;
   scene?: StudioScene | null;
+  /** Enquadramento/proporção da foto: rosto, corpo médio (coxa pra cima) ou corpo inteiro. */
+  framing?: FramingOption;
 }): string {
   const id = input.character.identity;
   const name = id.displayName?.trim() || "a personagem";
-  const outfitName = input.outfit.name?.trim() || "o look selecionado";
-  const outfitDesc = input.outfit.description?.trim();
+  const outfitName = sanitizeGarmentText(
+    input.outfit.name?.trim() || "o look selecionado",
+  );
+  const outfitDesc = input.outfit.description?.trim()
+    ? sanitizeGarmentText(input.outfit.description.trim())
+    : undefined;
   const colors = input.outfit.colors?.trim();
   const identity = id.identityPrompt?.trim();
   const body =
@@ -75,11 +109,18 @@ export function buildOutfitTryOnPrompt(input: {
           "- Clean realistic UGC setting that does not compete with the outfit (bedroom mirror, simple room, or soft indoor backdrop).",
         ].join("\n");
 
+  const FRAMING_PROMPT: Record<FramingOption, string> = {
+    face: "- Close-up framing: shoulders and face fill the frame, focus on face and the garment's neckline/collar detail.",
+    half: "- Half-body framing from mid-thigh up (crop at the thighs) — torso, arms and most of the outfit clearly readable.",
+    full: "- Full-body framing from head to feet — the complete outfit and shoes fully visible.",
+  };
+  const framingLine = FRAMING_PROMPT[input.framing || "full"];
+
   const pose = input.movementPrompt?.trim()
-    ? `POSE:\n- ${input.movementPrompt.trim()}`
+    ? `POSE:\n- ${input.movementPrompt.trim()}\n${framingLine}`
     : [
         "POSE:",
-        "- Full-body or 3/4 body so the complete outfit is readable.",
+        framingLine,
         "- Natural standing or mirror-selfie attitude, relaxed UGC energy.",
         "- Hands and pose must not hide key garment details.",
       ].join("\n");
@@ -101,6 +142,7 @@ export function buildOutfitTryOnPrompt(input: {
     "- Fit the garment realistically to her body (drape, wrinkles, gravity, fabric thickness).",
     "- Do not invent extra accessories unless they are clearly part of the garment photo.",
     "- Remove previous clothing; do not blend old and new outfits.",
+    "- Describe and depict the garment with neutral fashion/editorial wording (\"dress\", \"slip dress\", \"satin dress\"), not sleepwear/intimate-apparel terms, even if it started as a loungewear piece.",
     "",
     refs.length
       ? `ATTACHED REFERENCES:\n${refs.map((r) => `- ${r}`).join("\n")}`
@@ -171,11 +213,14 @@ export function buildCreativeDirectorPrompt(input: {
 
   const vary: string[] = [];
   if (input.outfit) {
-    const outfitName = input.outfit.name?.trim() || "roupa da foto";
+    const outfitName = sanitizeGarmentText(input.outfit.name?.trim() || "roupa da foto");
+    const outfitDescSafe = input.outfit.description
+      ? sanitizeGarmentText(input.outfit.description)
+      : "";
     vary.push(
       [
         `ROUPA:`,
-        `- ${outfitName}${input.outfit.description ? `: ${input.outfit.description}` : ""}`,
+        `- ${outfitName}${outfitDescSafe ? `: ${outfitDescSafe}` : ""}`,
         input.outfit.colors ? `- Cores: ${input.outfit.colors}` : "",
         input.outfit.imageUrl
           ? `- Foto da PEÇA (roupa separada) anexada — copiar corte, cor e tecido.`

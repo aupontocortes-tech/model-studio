@@ -5,7 +5,7 @@ import {
   targetLabel,
   type OrchestratorTarget,
 } from "@/services/claude/operatorPrompt";
-import { normalizeStudioCharacter, outfitLabel } from "@/domain/studioAssets";
+import { normalizeStudioCharacter, outfitLabel, framingLabel, type FramingOption } from "@/domain/studioAssets";
 import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
 import {
   studioCharacterRepo,
@@ -52,6 +52,11 @@ export async function GET(request: Request) {
   const editedPrompt = url.searchParams.get("prompt")?.trim();
   const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
   const target = parseTarget(url.searchParams.get("target"), kind);
+  const framingRaw = url.searchParams.get("framing");
+  const framing: FramingOption | undefined =
+    framingRaw === "face" || framingRaw === "half" || framingRaw === "full"
+      ? framingRaw
+      : undefined;
 
   if (!characterId) return jsonError("characterId obrigatório.");
   if (!outfitId) return jsonError("outfitId obrigatório — escolha o look.");
@@ -88,6 +93,7 @@ export async function GET(request: Request) {
           movementPrompt: movement?.prompt,
           keepSceneFromPhoto,
           scene,
+          framing,
         }));
 
   const env = getEnv();
@@ -117,12 +123,14 @@ export async function GET(request: Request) {
   if (movementId) packQuery.set("movementId", movementId);
   if (sceneId && !keepSceneFromPhoto) packQuery.set("sceneId", sceneId);
   if (!keepSceneFromPhoto) packQuery.set("keepSceneFromPhoto", "false");
+  if (framing) packQuery.set("framing", framing);
 
   const markdown = [
     `# Trabalho Model Studeo`,
     "",
     `- **Tipo:** ${kind === "video" ? "Vídeo" : "Foto (still)"}`,
     `- **Onde gerar:** ${targetLabel(target)}`,
+    kind === "image" ? `- **Proporção:** ${framingLabel(framing)}` : "",
     `- **App:** ${baseUrl}/gerar?character=${character.id}&outfit=${outfit.id}`,
     `- **Personagem:** ${character.identity.displayName} (\`${character.id}\`)`,
     `- **Look:** ${outfitLabel(outfit)} (\`${outfit.id}\`)`,

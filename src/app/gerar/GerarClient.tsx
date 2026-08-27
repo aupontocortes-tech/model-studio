@@ -18,6 +18,8 @@ import { FilePickButton } from "@/components/studio/FilePickButton";
 import {
   characterHasVoice,
   outfitLabel,
+  FRAMING_OPTIONS,
+  type FramingOption,
   type SavedStudioPrompt,
   type StudioCharacter,
   type StudioMediaKind,
@@ -53,6 +55,7 @@ export default function GerarStudioPage() {
   const [fullPrompt, setFullPrompt] = useState("");
   const [promptDirty, setPromptDirty] = useState(false);
   const [target, setTarget] = useState<"tokfy" | "flow" | "auto">("tokfy");
+  const [framing, setFraming] = useState<FramingOption>("full");
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -101,6 +104,7 @@ export default function GerarStudioPage() {
       movementPrompt: selectedMovement?.prompt,
       keepSceneFromPhoto,
       scene: keepSceneFromPhoto ? null : selectedScene || null,
+      framing,
     });
   }, [
     selected,
@@ -110,6 +114,7 @@ export default function GerarStudioPage() {
     selectedScene,
     kind,
     includeVoice,
+    framing,
   ]);
 
   useEffect(() => {
@@ -142,6 +147,7 @@ export default function GerarStudioPage() {
     setSceneId("");
     setKeepSceneFromPhoto(true);
     setIncludeVoice(true);
+    setFraming("full");
     setPromptDirty(false);
     setFullPrompt("");
   }, [characterId]);
@@ -190,6 +196,7 @@ export default function GerarStudioPage() {
         keepSceneFromPhoto,
         save: true,
         mode: kind === "image" ? "tryOn" : "default",
+        framing: kind === "image" ? framing : undefined,
         editedPrompt:
           kind === "image" && promptDirty ? fullPrompt : undefined,
       });
@@ -264,6 +271,7 @@ export default function GerarStudioPage() {
         sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
         keepSceneFromPhoto,
         movementId: movementId || undefined,
+        framing: kind === "image" ? framing : undefined,
       });
       await navigator.clipboard.writeText(pack.markdown);
       setMsg(
@@ -488,6 +496,33 @@ export default function GerarStudioPage() {
           )}
 
           <div className="mt-4 space-y-3">
+            {kind === "image" ? (
+              <div>
+                <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
+                  Proporção da foto
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {FRAMING_OPTIONS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => {
+                        setFraming(f.id);
+                        setPromptDirty(false);
+                      }}
+                      title={f.hint}
+                      className={`rounded-xl border px-2 py-2 text-center text-[11px] font-medium ${
+                        framing === f.id
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                          : "border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)]"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <Field label={kind === "image" ? "Pose / movimento (opcional)" : "Movimento"}>
               <select
                 className={inputClass}

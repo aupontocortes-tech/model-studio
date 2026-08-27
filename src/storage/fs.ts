@@ -1,8 +1,8 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getEnv } from "@/lib/env";
-import { isNeonEnabled } from "@/db/neon";
-import { bufferToDataUrl } from "@/lib/upload";
+import { isNeonEnabled, neonSaveFile } from "@/db/neon";
+import { bufferToDataUrl, guessImageMime } from "@/lib/upload";
 
 async function ensureDir(dir: string) {
   await fs.mkdir(dir, { recursive: true });
@@ -62,15 +62,20 @@ export async function saveUploadBuffer(opts: {
   const relativePath = path
     .join(opts.relativeDir, opts.filename)
     .replace(/\\/g, "/");
-  // Data URL fica no JSON da personagem/look — aparece na tela sem depender de arquivo em disco.
-  const publicUrl = bufferToDataUrl(
-    opts.buffer,
-    opts.filename,
-    opts.mimeHint,
-  );
+  const contentType = guessImageMime(opts.filename, opts.mimeHint);
 
+  // Guarda o arquivo de verdade (Neon studio_files ou disco) e devolve uma URL
+  // que serve os bytes sob demanda — evita embutir base64 gigante no registro.
   if (isNeonEnabled()) {
-    return { absolutePath: relativePath, publicUrl };
+    await neonSaveFile({
+      relativePath,
+      buffer: opts.buffer,
+      contentType,
+    });
+    return {
+      absolutePath: relativePath,
+      publicUrl: `/api/studio/files/${relativePath}`,
+    };
   }
 
   try {
@@ -79,8 +84,16 @@ export async function saveUploadBuffer(opts: {
     await ensureDir(dir);
     const absolutePath = path.join(dir, opts.filename);
     await fs.writeFile(absolutePath, opts.buffer);
-    return { absolutePath, publicUrl };
+    return {
+      absolutePath,
+      publicUrl: `/api/studio/files/${relativePath}`,
+    };
   } catch {
-    return { absolutePath: relativePath, publicUrl };
+    // Último recurso: se não der pra escrever em disco e não houver Neon,
+    // embute como data URL pra não perder o upload.
+    return {
+      absolutePath: relativePath,
+      publicUrl: bufferToDataUrl(opts.buffer, opts.filename, opts.mimeHint),
+    };
   }
 }

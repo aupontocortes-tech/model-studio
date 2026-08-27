@@ -2,6 +2,19 @@
 
 export type StudioMediaKind = "video" | "image";
 
+/** Enquadramento/proporção da foto gerada no try-on. */
+export type FramingOption = "face" | "half" | "full";
+
+export const FRAMING_OPTIONS: { id: FramingOption; label: string; hint: string }[] = [
+  { id: "face", label: "Rosto", hint: "Enquadramento fechado no rosto/ombros." },
+  { id: "half", label: "Corpo médio", hint: "Da coxa pra cima." },
+  { id: "full", label: "Corpo inteiro", hint: "Corpo completo, da cabeça aos pés." },
+];
+
+export function framingLabel(framing?: FramingOption): string {
+  return FRAMING_OPTIONS.find((f) => f.id === framing)?.label || "Corpo inteiro";
+}
+
 export interface CharacterIdentity {
   displayName: string;
   /** Bloco único / prompt de identidade (rosto + corpo). */

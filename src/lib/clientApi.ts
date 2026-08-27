@@ -434,6 +434,7 @@ export const api = {
       sceneId?: string;
       keepSceneFromPhoto?: boolean;
       movementId?: string;
+      framing?: "face" | "half" | "full";
     }) => {
       const q = new URLSearchParams();
       q.set("characterId", opts.characterId);
@@ -444,6 +445,7 @@ export const api = {
       if (opts.sceneId) q.set("sceneId", opts.sceneId);
       if (opts.keepSceneFromPhoto === false) q.set("keepSceneFromPhoto", "false");
       if (opts.movementId) q.set("movementId", opts.movementId);
+      if (opts.framing) q.set("framing", opts.framing);
       return fetch(`/api/studio/claude-pack?${q}`).then((r) =>
         parse<{
           markdown: string;

@@ -1,6 +1,7 @@
 import {
   emptyStudioCharacter,
   normalizeStudioCharacter,
+  type FramingOption,
   type SavedStudioPrompt,
   type StudioMediaKind,
 } from "@/domain/studioAssets";
@@ -45,6 +46,8 @@ export async function POST(request: Request) {
     mode?: "default" | "tryOn";
     /** Se o usuário editou o texto, grava esse bloco. */
     editedPrompt?: string;
+    /** Enquadramento da foto: rosto, corpo médio (coxa pra cima) ou corpo inteiro. */
+    framing?: FramingOption;
   };
 
   const now = nowIso();
@@ -150,6 +153,7 @@ export async function POST(request: Request) {
             movementPrompt: libMove?.prompt,
             keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
             scene: libraryScene || null,
+            framing: body.framing,
           });
         return {
           systemPrompt: "Outfit try-on",

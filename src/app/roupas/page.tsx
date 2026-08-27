@@ -297,7 +297,10 @@ export default function RoupasPage() {
                     placeholder="Opcional"
                   />
                 </Field>
-                <Field label="Prompt">
+                <Field
+                  label="Prompt"
+                  hint="Descreva a peça (corte, tecido, comprimento, detalhes) — entra no prompt da geração, independente da foto 'Ela vestida'."
+                >
                   <textarea
                     className={inputClass}
                     rows={4}
