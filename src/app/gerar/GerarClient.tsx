@@ -10,10 +10,13 @@ import {
   inputClass,
 } from "@/components/ui/primitives";
 import { api } from "@/lib/clientApi";
+import { prepareImageFile } from "@/lib/prepareImage";
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
+import { FilePickButton } from "@/components/studio/FilePickButton";
 import {
   characterHasVoice,
+  outfitLabel,
   type SavedStudioPrompt,
   type StudioCharacter,
   type StudioMediaKind,
@@ -119,13 +122,48 @@ export default function GerarStudioPage() {
       setFullPrompt(r.fullPrompt);
       setMsg(
         kind === "image"
-          ? "Prompt de imagem pronto — copie para gerar o still e usar no vídeo fora."
+          ? outfitId
+            ? "Prompt pronto. Gere o still fora e envie abaixo — salva em Ela vestida deste look."
+            : "Prompt de imagem pronto — copie para gerar o still. Escolha um look para salvar o resultado nele."
           : "Prompt de vídeo pronto — copie para a outra plataforma.",
       );
       const p = await api.studio.prompts.list();
       setSaved(p.prompts);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao gerar");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveStillToLook(file: File) {
+    if (!outfitId) {
+      setError("Escolha o look acima para salvar a imagem gerada nele.");
+      return;
+    }
+    if (!characterId) {
+      setError("Escolha uma personagem.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setMsg("Salvando no look…");
+    try {
+      const prepared = await prepareImageFile(file);
+      const { outfit } = await api.studio.outfits.upload(prepared, {
+        outfitId,
+        characterId,
+        slot: "worn",
+      });
+      setOutfits((prev) =>
+        prev.map((o) => (o.id === outfit.id ? outfit : o)),
+      );
+      setMsg(
+        `Still salvo em Ela vestida · ${outfitLabel(outfit)}. Aparece na Biblioteca.`,
+      );
+    } catch (e) {
+      setMsg("");
+      setError(e instanceof Error ? e.message : "Falha ao salvar no look.");
     } finally {
       setBusy(false);
     }
@@ -141,8 +179,8 @@ export default function GerarStudioPage() {
       <div className="space-y-4">
         <Panel title="1 · Imagem para usar fora">
           <p className="mb-3 text-xs leading-5 text-[var(--muted)]">
-            Gera prompt de still (ela vestida). Vídeo fica para o Flow ou outra
-            plataforma.
+            Gera prompt de still (ela vestida). Depois envie o resultado no look
+            escolhido. Vídeo fica para o Flow ou outra plataforma.
           </p>
           <div className="flex gap-2">
             {(
@@ -216,18 +254,19 @@ export default function GerarStudioPage() {
         <Panel title="3 · Peças desta cena">
           <div className="mb-4">
             <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
-              Look — peça e ela vestida
+              Look — peça e ela vestida (miniaturas)
             </p>
             {wardrobe.length === 0 && otherOutfits.length === 0 ? (
               <p className="text-sm text-[var(--muted)]">
-                Sem looks no banco. Cadastre a peça e a foto dela vestida na personagem.
+                Sem looks no banco. Cadastre a peça e a foto dela vestida na
+                personagem.
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                 <button
                   type="button"
                   onClick={() => setOutfitId("")}
-                  className={`flex aspect-[3/4] items-center justify-center rounded-xl border text-xs ${
+                  className={`flex aspect-square items-center justify-center rounded-xl border text-xs ${
                     !outfitId
                       ? "border-[var(--accent)] bg-[var(--accent-soft)] font-medium"
                       : "border-dashed border-[var(--line)] text-[var(--muted)]"
@@ -272,7 +311,7 @@ export default function GerarStudioPage() {
             <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
               Cenário
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => {
@@ -290,15 +329,15 @@ export default function GerarStudioPage() {
                   <img
                     src={sceneFromPhotoUrl}
                     alt="Cenário da imagem"
-                    className="aspect-[3/4] w-full object-cover"
+                    className="aspect-square w-full object-cover"
                   />
                 ) : (
-                  <div className="flex aspect-[3/4] items-center justify-center bg-[var(--panel-elevated)] px-3 text-center text-xs text-[var(--muted)]">
+                  <div className="flex aspect-square items-center justify-center bg-[var(--panel-elevated)] px-3 text-center text-xs text-[var(--muted)]">
                     Sem foto ainda
                   </div>
                 )}
                 <p className="px-2 py-1.5 text-[11px] font-medium text-[var(--ink)]">
-                  Usar o cenário da imagem dela
+                  Cenário da imagem dela
                 </p>
               </button>
               {herScenes.map((s) => (
@@ -332,7 +371,8 @@ export default function GerarStudioPage() {
                 checked={includeVoice}
                 onChange={(e) => setIncludeVoice(e.target.checked)}
               />
-              Incluir voz de {selected.voice?.name || selected.identity.displayName}
+              Incluir voz de{" "}
+              {selected.voice?.name || selected.identity.displayName}
             </label>
           ) : null}
         </Panel>
@@ -360,14 +400,47 @@ export default function GerarStudioPage() {
               className="mt-3"
               variant="secondary"
               onClick={() =>
-                void navigator.clipboard.writeText(fullPrompt).then(() =>
-                  setMsg("Copiado."),
-                )
+                void navigator.clipboard
+                  .writeText(fullPrompt)
+                  .then(() => setMsg("Copiado."))
               }
             >
               <Copy size={14} />
               Copiar
             </Button>
+
+            {kind === "image" ? (
+              <div className="mt-4 space-y-2 rounded-xl border border-dashed border-[var(--line)] p-3">
+                <p className="text-xs font-medium text-[var(--ink)]">
+                  Salvar still no look
+                  {selectedOutfit
+                    ? ` · ${outfitLabel(selectedOutfit)}`
+                    : " · escolha um look acima"}
+                </p>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Depois de gerar a imagem fora, envie aqui. Vai direto para Ela
+                  vestida na Biblioteca.
+                </p>
+                {selectedOutfit?.wornImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={selectedOutfit.wornImageUrl}
+                    alt="Ela vestida"
+                    className="h-24 w-24 rounded-lg object-cover"
+                  />
+                ) : null}
+                <FilePickButton
+                  accept="image/*,.heic,.heif"
+                  label={
+                    selectedOutfit?.wornImageUrl
+                      ? "Trocar still no look"
+                      : "Enviar still gerado"
+                  }
+                  disabled={busy || !outfitId}
+                  onFile={(f) => void saveStillToLook(f)}
+                />
+              </div>
+            ) : null}
           </Panel>
         ) : null}
 

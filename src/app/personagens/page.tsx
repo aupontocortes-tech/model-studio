@@ -569,14 +569,14 @@ export default function BibliotecaPersonagensPage() {
 
             <Panel
               title="Looks dela"
-              description="Cada look tem a peça (roupa separada) e, se tiver, ela já vestida. O app guarda imagem — o vídeo você faz em outra plataforma."
+              description="Peça e ela vestida em miniaturas — clique para ampliar. Ao gerar still na Criação, a imagem vai para Ela vestida deste look."
             >
               {wardrobe.length === 0 ? (
                 <p className="mb-3 text-sm text-[var(--muted)]">
                   Nenhum look ainda. Envie a foto da peça e/ou dela vestida.
                 </p>
               ) : (
-                <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {wardrobe.map((o) => (
                     <OutfitCard
                       key={o.id}
@@ -604,18 +604,21 @@ export default function BibliotecaPersonagensPage() {
                       ? ` · ${outfitLabel(selectedLook)}`
                       : " · sem nome"}
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Miniaturas — clique na foto para ampliar.
+                  </p>
+                  <div className="flex flex-wrap gap-4">
                     <div>
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
-                        Peça (roupa separada)
+                        Peça
                       </p>
                       <PhotoPickSlot
+                        compact
                         src={selectedLook.imageUrl}
                         alt="Peça"
-                        emptyLabel="Sem foto da peça"
-                        aspectClass="aspect-[3/4]"
+                        emptyLabel="Sem peça"
                         buttonLabel={
-                          selectedLook.imageUrl ? "Trocar peça" : "Enviar peça"
+                          selectedLook.imageUrl ? "Trocar" : "Enviar"
                         }
                         disabled={busy}
                         onFile={(f) =>
@@ -631,14 +634,12 @@ export default function BibliotecaPersonagensPage() {
                         Ela vestida
                       </p>
                       <PhotoPickSlot
+                        compact
                         src={selectedLook.wornImageUrl}
                         alt="Ela vestida"
-                        emptyLabel="Sem foto dela vestida"
-                        aspectClass="aspect-[3/4]"
+                        emptyLabel="Sem foto"
                         buttonLabel={
-                          selectedLook.wornImageUrl
-                            ? "Trocar vestida"
-                            : "Enviar ela vestida"
+                          selectedLook.wornImageUrl ? "Trocar" : "Enviar"
                         }
                         disabled={busy}
                         onFile={(f) =>
@@ -676,7 +677,7 @@ export default function BibliotecaPersonagensPage() {
                   <p className="mb-2 text-xs font-medium text-[var(--ink)]">
                     Da biblioteca — clique para adicionar a ela
                   </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                     {availableOutfits.map((o) => (
                       <OutfitCard
                         key={o.id}

@@ -1,6 +1,8 @@
 "use client";
 
-import { Upload } from "lucide-react";
+import { useState } from "react";
+import { Upload, ZoomIn } from "lucide-react";
+import { ImageLightbox } from "@/components/studio/ImageLightbox";
 
 const ACCEPT_IMAGE = "image/*,.heic,.heif,.jpg,.jpeg,.png,.webp";
 
@@ -41,7 +43,7 @@ export function FilePickButton({
   );
 }
 
-/** Quadro da foto inteiro é clicável — não só o botão embaixo. */
+/** Quadro da foto — clique abre maior; botão envia/troca. */
 export function PhotoPickSlot({
   src,
   alt,
@@ -50,6 +52,7 @@ export function PhotoPickSlot({
   aspectClass = "aspect-square",
   disabled,
   onFile,
+  compact = false,
 }: {
   src?: string;
   alt: string;
@@ -58,49 +61,69 @@ export function PhotoPickSlot({
   aspectClass?: string;
   disabled?: boolean;
   onFile: (file: File) => void;
+  /** Miniatura quadrada pequena (looks / galeria). */
+  compact?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const boxClass = compact
+    ? "aspect-square w-full max-w-[7.5rem]"
+    : `${aspectClass} w-full`;
+
   return (
-    <div>
-      <label
-        className={`relative mb-2 block overflow-hidden rounded-xl ${
-          disabled ? "pointer-events-none opacity-50" : "cursor-pointer"
-        }`}
-      >
-        {src ? (
-          // eslint-disable-next-line @next/next/no-img-element
+    <div className={compact ? "w-full max-w-[7.5rem]" : undefined}>
+      {src ? (
+        <button
+          type="button"
+          className={`relative mb-2 block overflow-hidden rounded-xl ${boxClass} ${
+            disabled ? "opacity-50" : ""
+          }`}
+          onClick={() => setOpen(true)}
+          title="Ver maior"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
             alt={alt}
-            className={`${aspectClass} w-full bg-[var(--panel)] object-cover`}
+            className="h-full w-full bg-[var(--panel)] object-cover"
           />
-        ) : (
-          <div
-            className={`${aspectClass} flex w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--line)] bg-[var(--panel)] px-3 text-center text-xs text-[var(--muted)]`}
-          >
-            <Upload size={18} />
+          <span className="absolute bottom-1 right-1 rounded-md bg-black/55 p-1 text-white">
+            <ZoomIn size={12} />
+          </span>
+        </button>
+      ) : (
+        <label
+          className={`relative mb-2 block overflow-hidden rounded-xl ${boxClass} ${
+            disabled ? "pointer-events-none opacity-50" : "cursor-pointer"
+          }`}
+        >
+          <div className="flex h-full w-full flex-col items-center justify-center gap-1 border border-dashed border-[var(--line)] bg-[var(--panel)] px-2 text-center text-[10px] text-[var(--muted)]">
+            <Upload size={compact ? 14 : 18} />
             <span>{emptyLabel}</span>
-            <span className="text-[10px]">Toque para escolher a foto</span>
           </div>
-        )}
-        <input
-          type="file"
-          accept={ACCEPT_IMAGE}
-          disabled={disabled}
-          aria-label={buttonLabel}
-          className="sr-only"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) onFile(f);
-          }}
-        />
-      </label>
+          <input
+            type="file"
+            accept={ACCEPT_IMAGE}
+            disabled={disabled}
+            aria-label={buttonLabel}
+            className="sr-only"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) onFile(f);
+            }}
+          />
+        </label>
+      )}
       <FilePickButton
         accept={ACCEPT_IMAGE}
         label={buttonLabel}
         disabled={disabled}
         onFile={onFile}
+        className={compact ? "min-h-8 w-full px-2 py-1.5 text-[11px]" : ""}
       />
+      {open && src ? (
+        <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />
+      ) : null}
     </div>
   );
 }

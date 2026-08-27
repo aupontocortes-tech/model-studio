@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/primitives";
 import { LibraryTabs } from "@/components/studio/LibraryTabs";
 import { OutfitCard } from "@/components/studio/OutfitCard";
+import { PhotoPickSlot } from "@/components/studio/FilePickButton";
 import { api } from "@/lib/clientApi";
+import { prepareImageFile } from "@/lib/prepareImage";
 import { type StudioCharacter, type StudioOutfit } from "@/domain/studioAssets";
 import { Trash2, Upload } from "lucide-react";
 
@@ -185,90 +187,55 @@ export default function RoupasPage() {
         ) : (
           <div className="space-y-4">
             <Panel title="Peça e ela vestida">
-              <div className="grid gap-3 sm:grid-cols-2">
+              <p className="mb-3 text-[11px] text-[var(--muted)]">
+                Miniaturas — clique na foto para ampliar.
+              </p>
+              <div className="flex flex-wrap gap-4">
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
-                    Peça (roupa separada)
+                    Peça
                   </p>
-                  {selected.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selected.imageUrl}
-                      alt="Peça"
-                      className="mb-2 aspect-[3/4] w-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
-                      Sem peça
-                    </div>
-                  )}
-                  <Button
-                    variant="secondary"
-                    onClick={() => replaceRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    {selected.imageUrl ? "Trocar peça" : "Enviar peça"}
-                  </Button>
+                  <PhotoPickSlot
+                    compact
+                    src={selected.imageUrl}
+                    alt="Peça"
+                    emptyLabel="Sem peça"
+                    buttonLabel={selected.imageUrl ? "Trocar" : "Enviar"}
+                    disabled={busy}
+                    onFile={(f) =>
+                      void run(async () => {
+                        const prepared = await prepareImageFile(f);
+                        await api.studio.outfits.upload(prepared, {
+                          outfitId: selectedId,
+                          slot: "piece",
+                        });
+                      }, "Foto da peça atualizada.")
+                    }
+                  />
                 </div>
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
                     Ela vestida
                   </p>
-                  {selected.wornImageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={selected.wornImageUrl}
-                      alt="Ela vestida"
-                      className="mb-2 aspect-[3/4] w-full rounded-xl object-cover"
-                    />
-                  ) : (
-                    <div className="mb-2 flex aspect-[3/4] items-center justify-center rounded-xl border border-dashed border-[var(--line)] text-sm text-[var(--muted)]">
-                      Sem foto dela vestida
-                    </div>
-                  )}
-                  <Button
-                    variant="secondary"
-                    onClick={() => replaceWornRef.current?.click()}
-                  >
-                    <Upload size={14} />
-                    {selected.wornImageUrl ? "Trocar vestida" : "Enviar vestida"}
-                  </Button>
+                  <PhotoPickSlot
+                    compact
+                    src={selected.wornImageUrl}
+                    alt="Ela vestida"
+                    emptyLabel="Sem foto"
+                    buttonLabel={selected.wornImageUrl ? "Trocar" : "Enviar"}
+                    disabled={busy}
+                    onFile={(f) =>
+                      void run(async () => {
+                        const prepared = await prepareImageFile(f);
+                        await api.studio.outfits.upload(prepared, {
+                          outfitId: selectedId,
+                          slot: "worn",
+                        });
+                      }, "Foto dela vestida atualizada.")
+                    }
+                  />
                 </div>
               </div>
-              <input
-                ref={replaceRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  void run(async () => {
-                    await api.studio.outfits.upload(f, {
-                      outfitId: selectedId,
-                      slot: "piece",
-                    });
-                  }, "Foto da peça atualizada.");
-                }}
-              />
-              <input
-                ref={replaceWornRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  void run(async () => {
-                    await api.studio.outfits.upload(f, {
-                      outfitId: selectedId,
-                      slot: "worn",
-                    });
-                  }, "Foto dela vestida atualizada.");
-                }}
-              />
             </Panel>
 
             <Panel title="Detalhes (opcional)">
