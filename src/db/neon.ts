@@ -40,9 +40,11 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
       : typeof last === "string"
         ? last
         : "Falha ao conectar no Neon.";
-  throw new Error(
-    `${message} Confira DATABASE_URL na Vercel (connection string com -pooler, sslmode=require).`,
-  );
+  const hint =
+    /json/i.test(message)
+      ? ""
+      : " Confira DATABASE_URL na Vercel (connection string com -pooler, sslmode=require).";
+  throw new Error(`${message}${hint}`);
 }
 
 /** Tabelas: KV das coleções JSON + arquivos binários (fotos/áudio). */
@@ -94,10 +96,11 @@ export async function neonWriteCollection<T>(
   await ensureStudioSchema();
   await withRetry(async () => {
     const db = getSql();
-    const value = items as unknown as Record<string, unknown>[];
+    // Neon HTTP serializa array JS como array Postgres — JSONB precisa de texto JSON + cast.
+    const payload = JSON.stringify(items);
     await db`
       INSERT INTO studio_kv (key, value, updated_at)
-      VALUES (${key}, ${value}, NOW())
+      VALUES (${key}, ${payload}::jsonb, NOW())
       ON CONFLICT (key) DO UPDATE
       SET value = EXCLUDED.value, updated_at = NOW()
     `;
