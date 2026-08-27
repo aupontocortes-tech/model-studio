@@ -484,7 +484,7 @@ export default function GerarStudioPage() {
 
         <Panel title="4 · Look da área de roupas">
           <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
-            Escolha o look — o comando usa essa roupa
+            Escolha o look — toque no card (Peça ou Vestida). A lupa só amplia.
           </p>
           {wardrobe.length === 0 && otherOutfits.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
