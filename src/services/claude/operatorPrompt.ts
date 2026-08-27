@@ -1,77 +1,101 @@
 /**
- * Prompt mestre para o Claude operar Model Studeo + DICloak + Flow/Veo3 + Kalodata.
- * Usado em /api/claude-brief e na UI "Copiar prompt Claude".
+ * Prompt mestre — cole UMA VEZ no Claude (projeto / instruções).
+ * Depois só envie os pacotes de trabalho do Model Studeo (/gerar).
  */
 
+export type OrchestratorTarget = "tokfy" | "flow" | "auto";
+
 export const CLAUDE_OPERATOR_SYSTEM_PROMPT = `# Papel
-Você é o operador de automação do **Model Studeo** (app local em http://127.0.0.1:3000).
-Seu trabalho: ler o que o Model Studeo preparou e executar no navegador DICloak:
-- **Google Flow / Veo3** → gerar imagem e vídeo
-- **Kalodata** → pesquisar produto / referência comercial (quando pedido)
+Você é o **operador** do Model Studeo. O app monta personagem, look e prompt; você **executa** nas ferramentas com Computer Use.
 
-Você NÃO substitui o Model Studeo na montagem de prompt. O studio monta; você executa.
+# Model Studeo (fonte da verdade)
+- UI: URL que vier no pacote (local ou Vercel)
+- Personagens, looks, fotos e prompts ficam no app
+- Pacote de trabalho: botão **Enviar para Claude** em /gerar ou \`GET /api/studio/claude-pack?characterId=&outfitId=&kind=\`
 
-# Stack
-1. **Model Studeo** (localhost:3000) — avatar, roupa, prompts, takes de 8s
-2. **DICloak** — perfis isolados (Flow/Veo3, Kalodata, etc.)
-3. **Google Flow** (https://flow.google/) — geração Veo / imagem (NÃO use a landing labs.google de marketing)
-4. **Kalodata** — espionagem/pesquisa de produto
+# Ferramentas (escolha conforme o pacote ou peça do usuário)
+1. **Tokfy** — https://tokfy.ai/app/inicio — vídeo + ChatGPT ilimitado (preferido para vídeo e imagem via chat)
+2. **Google Flow** — https://flow.google/ — Veo / still (alternativa)
+3. **Kalodata** — pesquisa de produto (quando pedido)
+4. **Qualquer outra** que o usuário indicar — abra com Computer Use e siga o prompt do pacote
 
-# Como obter o pacote de trabalho
-Sempre que for gerar:
-1. Preferir o pacote do studio criativo:
-   \`GET /api/studio/claude-pack?characterId=...&outfitId=...\`
-   (ou botão **Copiar pacote Claude** em /gerar)
-2. Alternativa legado: \`GET /api/claude-brief\` (gerações antigas em /criar)
-3. O pacote traz: prompt try-on, personagem, look, links Flow.
+# Fluxo padrão
+1. Leia o pacote (personagem, look, prompt, referências, "Onde gerar")
+2. Abra a ferramenta indicada no navegador
+3. Anexe referências (rosto, corpo, peça) quando existirem
+4. Cole o PROMPT do pacote — não reescreva do zero
+5. Gere foto ou vídeo 9:16 UGC realista
+6. **Foto:** avise o usuário para salvar em **Ela vestida** no look (ou faça upload se tiver acesso ao app)
+7. **Vídeo:** entregue o arquivo ou link ao usuário
 
-# Fluxo padrão (trocar look / still)
-1. No Model Studeo (/gerar) o usuário escolheu personagem + look e tem o prompt editável.
-2. Você recebe o PROMPT + referências (rosto, corpo, peça).
-3. DICloak → perfil Flow → https://flow.google/
-4. Cole o prompt, anexe as fotos, gere o still 9:16.
-5. Usuário salva o still em **Ela vestida** no look (botão no app).
+# Regras
+- Roupa da referência é autoritativa (cor, corte, detalhes)
+- Mesma personagem em todos os takes
+- Vertical 9:16, UGC TikTok realista
+- Confirme qual ferramenta abriu e cada etapa concluída
 
-# Fluxo legado (vídeo UGC em /criar)
-1. No Model Studeo o usuário já enviou **avatar** + **roupa** e clicou Gerar (modo prompt-only).
-2. Você recebe \`imagePrompt\`, \`negativePrompt\`, \`videoPrompt\` / takes, e URLs.
-3. Imagem primeiro, vídeo depois (takes ~8s).
-
-# Kalodata (quando pedido)
-1. DICloak → perfil **Kalodata**
-2. Pesquise o termo em \`kalodataHint\` ou o nome do produto do briefing
-3. Resuma: produto, preço, ângulos, claims — devolva ao usuário ou ao Model Studeo
-
-# Regras de fidelidade (obrigatório)
-- Roupa do PRODUCT_REFERENCE é autoritativa (cor, corte, detalhes)
-- Avatar/rosto/corpo travados — não trocar identidade
-- Vertical 9:16, estilo UGC TikTok realista
-- Takes = segmentos de ~8s da MESMA personagem/roupa, não looks diferentes
-- Não inventar UI do TikTok na imagem/vídeo
-
-# Se não tiver Open API / MCP DICloak
-- Peça ao usuário: Abrir o perfil Flow no DICloak
-- Oriente clique a clique OU use Computer Use na janela já aberta
-- Sempre use os prompts do Model Studeo (não reescreva do zero a menos que peçam ajuste)
-
-# Se tiver MCP DICloak (Open API)
-- Use as tools do bridge para abrir o perfil certo
-- Depois opere Flow/Kalodata dentro desse navegador
-- Base URL tipica: http://127.0.0.1:52140/openapi + header X-API-KEY
-
-# Comunicação com o usuário
-- Confirme qual geração (id) está usando
-- Diga quando for abrir Flow vs Kalodata
-- Se travar na landing do Flow, mude para https://flow.google/
-- Ao terminar: informe o que gerou (imagem/vídeo) e próximos passos
-
-# APIs úteis do Model Studeo
-- GET /api/claude-brief — pacote completo para você
-- GET /api/claude-brief?mode=prompt — só o prompt mestre (este texto)
-- GET /api/generations — lista gerações
-- GET /api/meta — provider, URLs Flow/Kalodata
-- App UI: http://127.0.0.1:3000/criar
+# APIs úteis
+- GET /api/studio/claude-pack — pacote atual
+- GET /api/meta — URLs e status do app
+- GET /api/studio/characters — listar personagens
 `;
+
+export function targetLabel(target: OrchestratorTarget): string {
+  if (target === "tokfy") return "Tokfy (vídeo + ChatGPT)";
+  if (target === "flow") return "Google Flow";
+  return "Claude escolhe a melhor";
+}
+
+export function buildOrchestratorMission(opts: {
+  kind: "image" | "video";
+  target: OrchestratorTarget;
+  tokfyUrl: string;
+  flowUrl: string;
+}): string[] {
+  const { kind, target, tokfyUrl, flowUrl } = opts;
+  const useTokfy = target === "tokfy" || (target === "auto" && kind === "video");
+  const useFlow = target === "flow" || (target === "auto" && kind === "image");
+
+  if (useTokfy) {
+    return kind === "video"
+      ? [
+          `1. Abra ${tokfyUrl}`,
+          "2. Vá na área de vídeo (ou ChatGPT do Tokfy se for gerar frame primeiro).",
+          "3. Anexe referências: rosto, corpo, peça (e still vestida se houver).",
+          "4. Cole o PROMPT abaixo e gere o vídeo 9:16.",
+          "5. Baixe e avise o usuário.",
+        ]
+      : [
+          `1. Abra ${tokfyUrl}`,
+          "2. Use o ChatGPT ilimitado do Tokfy para gerar a FOTO.",
+          "3. Anexe referências (rosto, corpo, peça).",
+          "4. Cole o PROMPT abaixo.",
+          "5. Baixe o still e salve em **Ela vestida** no look no Model Studeo.",
+        ];
+  }
+
+  if (useFlow) {
+    return kind === "video"
+      ? [
+          `1. Abra ${flowUrl}`,
+          "2. Use still vestida como frame se existir.",
+          "3. Cole o PROMPT de vídeo e gere.",
+          "4. Baixe e avise o usuário.",
+        ]
+      : [
+          `1. Abra ${flowUrl}`,
+          "2. Anexe referências (rosto, corpo, peça).",
+          "3. Cole o PROMPT e gere still 9:16.",
+          "4. Salve em **Ela vestida** no look.",
+        ];
+  }
+
+  return [
+    "1. Escolha Tokfy (vídeo/ChatGPT) ou Flow conforme o tipo.",
+    "2. Execute com o PROMPT e referências abaixo.",
+    "3. Confirme resultado com o usuário.",
+  ];
+}
 
 export function buildClaudePackMarkdown(input: {
   baseUrl: string;
@@ -89,6 +113,7 @@ export function buildClaudePackMarkdown(input: {
   kalodataHint?: string;
   flowUrl?: string;
   kalodataUrl?: string;
+  tokfyUrl?: string;
 }): string {
   const abs = (url?: string | null) => {
     if (!url) return "";
@@ -103,10 +128,11 @@ export function buildClaudePackMarkdown(input: {
     `Status: ${input.status || "—"}`,
     `Produto: ${input.productName || "—"}`,
     `Personagem: ${input.characterName || "—"}`,
+    `Tokfy: ${input.tokfyUrl || "https://tokfy.ai/app/inicio"}`,
     `Flow: ${input.flowUrl || "https://flow.google/"}`,
     `Kalodata: ${input.kalodataUrl || "https://www.kalodata.com/"}`,
     ``,
-    `## Referências (anexar no Flow)`,
+    `## Referências (anexar na ferramenta)`,
     `- Avatar: ${abs(input.avatarUrl) || "(sem URL)"}`,
   ];
 
@@ -120,7 +146,7 @@ export function buildClaudePackMarkdown(input: {
 
   lines.push(
     ``,
-    `## Prompt IMAGEM (colar no Flow primeiro)`,
+    `## Prompt IMAGEM (colar na ferramenta primeiro)`,
     "```",
     input.imagePrompt || "(vazio — rode Gerar no Model Studeo)",
     "```",
@@ -159,11 +185,10 @@ export function buildClaudePackMarkdown(input: {
   lines.push(
     ``,
     `## Instrução rápida para você (Claude)`,
-    `1. Abra DICloak → perfil Flow/Veo3`,
-    `2. Abra ${input.flowUrl || "https://flow.google/"}`,
-    `3. Gere a IMAGEM com o prompt + anexos avatar/roupa`,
-    `4. Gere o VÍDEO take a take (8s) com a imagem aprovada`,
-    `5. Se pedirem pesquisa: perfil Kalodata + termo acima`,
+    `1. Abra Tokfy (${input.tokfyUrl || "https://tokfy.ai/app/inicio"}) ou Flow conforme o tipo`,
+    `2. Gere IMAGEM com prompt + anexos avatar/roupa`,
+    `3. Gere VÍDEO take a take (8s) se aplicável`,
+    `4. Se pedirem pesquisa: Kalodata + termo acima`,
   );
 
   return lines.join("\n");

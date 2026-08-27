@@ -1,7 +1,9 @@
 import { jsonError, jsonOk } from "@/lib/api";
 import { getEnv } from "@/lib/env";
 import {
-  CLAUDE_OPERATOR_SYSTEM_PROMPT,
+  buildOrchestratorMission,
+  targetLabel,
+  type OrchestratorTarget,
 } from "@/services/claude/operatorPrompt";
 import { normalizeStudioCharacter, outfitLabel } from "@/domain/studioAssets";
 import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
@@ -22,9 +24,23 @@ function requestBaseUrl(request: Request): string {
   return `${proto}://${host}`;
 }
 
+function parseTarget(raw: string | null, kind: "image" | "video"): OrchestratorTarget {
+  if (raw === "tokfy" || raw === "flow" || raw === "auto") return raw;
+  return kind === "video" ? "tokfy" : "auto";
+}
+
+function refLine(label: string, url: string | undefined, baseUrl: string): string {
+  if (!url) return "";
+  if (url.startsWith("data:")) {
+    return `- ${label}: (foto no app — abra Biblioteca ou use preview no Model Studeo)`;
+  }
+  const abs = url.startsWith("http") ? url : `${baseUrl}${url.startsWith("/") ? "" : "/"}${url}`;
+  return `- ${label}: ${abs}`;
+}
+
 /**
- * Pacote para Claude Computer Use: dados da avatar + look + prompt + links.
- * GET ?characterId=&outfitId=&prompt= (prompt opcional — senão monta try-on)
+ * Pacote compacto para Claude Computer Use.
+ * GET ?characterId=&outfitId=&kind=&target=tokfy|flow|auto
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -35,13 +51,10 @@ export async function GET(request: Request) {
   const movementId = url.searchParams.get("movementId")?.trim();
   const editedPrompt = url.searchParams.get("prompt")?.trim();
   const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
+  const target = parseTarget(url.searchParams.get("target"), kind);
 
-  if (!characterId) {
-    return jsonError("characterId obrigatório.");
-  }
-  if (!outfitId) {
-    return jsonError("outfitId obrigatório — escolha o look.");
-  }
+  if (!characterId) return jsonError("characterId obrigatório.");
+  if (!outfitId) return jsonError("outfitId obrigatório — escolha o look.");
 
   const raw = await studioCharacterRepo.get(characterId);
   if (!raw) return jsonError("Personagem não encontrada.", 404);
@@ -81,75 +94,70 @@ export async function GET(request: Request) {
   const baseUrl = requestBaseUrl(request);
 
   const refs = [
-    character.faceImageUrl
-      ? `- Rosto: ${character.faceImageUrl.startsWith("data:") ? "(data URL no app — baixe pela Biblioteca ou use o botão Gerar no Flow local)" : `${baseUrl}${character.faceImageUrl}`}`
-      : "",
-    character.bodyImageUrl
-      ? `- Corpo: ${character.bodyImageUrl.startsWith("data:") ? "(data URL no app)" : `${baseUrl}${character.bodyImageUrl}`}`
-      : "",
-    outfit.imageUrl
-      ? `- Peça: ${outfit.imageUrl.startsWith("data:") ? "(data URL no app)" : `${baseUrl}${outfit.imageUrl}`}`
-      : "",
-    outfit.wornImageUrl
-      ? `- Já vestida (se houver): ${outfit.wornImageUrl.startsWith("data:") ? "(data URL no app)" : `${baseUrl}${outfit.wornImageUrl}`}`
-      : "",
+    refLine("Rosto", character.faceImageUrl, baseUrl),
+    refLine("Corpo", character.bodyImageUrl, baseUrl),
+    refLine("Peça", outfit.imageUrl, baseUrl),
+    refLine("Ela vestida", outfit.wornImageUrl, baseUrl),
   ].filter(Boolean);
 
+  const mission = buildOrchestratorMission({
+    kind,
+    target,
+    tokfyUrl: env.tokfyUrl,
+    flowUrl: env.googleFlowUrl,
+  });
+
+  const packQuery = new URLSearchParams({
+    characterId: character.id,
+    outfitId: outfit.id,
+    kind,
+    target,
+  });
+  if (editedPrompt) packQuery.set("prompt", editedPrompt);
+  if (movementId) packQuery.set("movementId", movementId);
+  if (sceneId && !keepSceneFromPhoto) packQuery.set("sceneId", sceneId);
+  if (!keepSceneFromPhoto) packQuery.set("keepSceneFromPhoto", "false");
+
   const markdown = [
-    `# Pacote Claude — ${kind === "video" ? "Vídeo" : "Trocar look (foto)"}`,
+    `# Trabalho Model Studeo`,
     "",
-    CLAUDE_OPERATOR_SYSTEM_PROMPT,
+    `- **Tipo:** ${kind === "video" ? "Vídeo" : "Foto (still)"}`,
+    `- **Onde gerar:** ${targetLabel(target)}`,
+    `- **App:** ${baseUrl}/gerar?character=${character.id}&outfit=${outfit.id}`,
+    `- **Personagem:** ${character.identity.displayName} (\`${character.id}\`)`,
+    `- **Look:** ${outfitLabel(outfit)} (\`${outfit.id}\`)`,
     "",
-    "---",
-    "",
-    `## Trabalho atual`,
-    `- Tipo: ${kind === "video" ? "VÍDEO" : "FOTO (still)"}`,
-    `- App: ${baseUrl}/gerar?character=${character.id}`,
-    `- Personagem: ${character.identity.displayName} (\`${character.id}\`)`,
-    `- Look: ${outfitLabel(outfit)} (\`${outfit.id}\`)`,
-    `- Ferramenta: ${env.googleFlowUrl}`,
-    "",
-    "## Missão",
-    kind === "video"
-      ? [
-          "1. Abra o perfil Flow no DICloak (ou Computer Use).",
-          "2. Vá para https://flow.google/",
-          "3. Use a foto dela vestida (se houver) como frame inicial.",
-          "4. Cole o PROMPT de vídeo abaixo e gere.",
-          "5. Baixe o vídeo e avise o usuário.",
-        ].join("\n")
-      : [
-          "1. Abra o perfil Flow no DICloak (ou Computer Use).",
-          "2. Vá para https://flow.google/",
-          "3. Cole o PROMPT abaixo.",
-          "4. Anexe as referências (rosto, corpo, peça).",
-          "5. Gere o still 9:16.",
-          "6. Baixe e no Model Studeo use **Enviar still gerado** (Ela vestida).",
-        ].join("\n"),
+    "## Passos",
+    mission.join("\n"),
     "",
     "## Referências",
-    refs.length ? refs.join("\n") : "- (sem fotos — complete o banco primeiro)",
+    refs.length ? refs.join("\n") : "- Complete fotos na Biblioteca primeiro",
     "",
-    "## PROMPT (colar no Flow)",
+    "## PROMPT",
     "```",
     prompt,
     "```",
     "",
-    "## APIs úteis",
-    `- GET ${baseUrl}/api/studio/claude-pack?characterId=${character.id}&outfitId=${outfit.id}`,
-    `- POST ${baseUrl}/api/studio/try-on-flow (só local — abre Flow via agente)`,
-    `- POST ${baseUrl}/api/studio/outfits/upload slot=worn — salvar still no look`,
+    "## Depois de gerar",
+    kind === "image"
+      ? "Salve o still em **Ela vestida** no look (Biblioteca ou envio manual em /gerar)."
+      : "Entregue o vídeo ao usuário.",
+    "",
+    `_Pacote: GET ${baseUrl}/api/studio/claude-pack?${packQuery.toString()}_`,
   ].join("\n");
 
   return jsonOk({
-    kind: "studio_try_on_claude_pack",
+    kind: "studio_orchestrator_pack",
     ready: true,
     characterId: character.id,
     outfitId: outfit.id,
+    mediaKind: kind,
+    target,
     prompt,
     markdown,
+    tokfyUrl: env.tokfyUrl,
     flowUrl: env.googleFlowUrl,
     howToUse:
-      "Cole o markdown no Claude (Computer Use). Ou no PC local use Gerar no Flow no app.",
+      "Cole no Claude (Computer Use). Configure o prompt mestre uma vez em Configurações.",
   });
 }

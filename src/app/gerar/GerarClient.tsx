@@ -24,7 +24,7 @@ import {
   type StudioOutfit,
   type StudioScene,
 } from "@/domain/studioAssets";
-import { Copy, Bot, MonitorPlay, RefreshCw } from "lucide-react";
+import { Copy, Bot, RefreshCw } from "lucide-react";
 
 type AgentJobView = {
   id: string;
@@ -52,7 +52,7 @@ export default function GerarStudioPage() {
   const [msg, setMsg] = useState("");
   const [fullPrompt, setFullPrompt] = useState("");
   const [promptDirty, setPromptDirty] = useState(false);
-  const [tool, setTool] = useState<"flow" | "claude">("claude");
+  const [target, setTarget] = useState<"tokfy" | "flow" | "auto">("tokfy");
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -242,6 +242,11 @@ export default function GerarStudioPage() {
     }
   }
 
+  useEffect(() => {
+    setTarget(kind === "video" ? "tokfy" : "auto");
+    setPromptDirty(false);
+  }, [kind]);
+
   async function copyClaudePack() {
     if (!characterId || !outfitId) {
       setError("Escolha personagem e look primeiro.");
@@ -255,15 +260,14 @@ export default function GerarStudioPage() {
         outfitId,
         prompt: fullPrompt || undefined,
         kind,
+        target,
         sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
         keepSceneFromPhoto,
         movementId: movementId || undefined,
       });
       await navigator.clipboard.writeText(pack.markdown);
       setMsg(
-        kind === "video"
-          ? "Pacote Claude (vídeo) copiado — cole no Claude para ele gerar na ferramenta."
-          : "Pacote Claude (foto) copiado — cole no Claude para ele gerar na ferramenta.",
+        "Pacote copiado — cole no Claude (Computer Use). Ele abre a ferramenta e gera.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao montar pacote Claude.");
@@ -281,12 +285,11 @@ export default function GerarStudioPage() {
       setError("Escreva ou restaure o prompt.");
       return;
     }
+    await copyClaudePack();
+  }
 
-    if (tool === "claude") {
-      await copyClaudePack();
-      return;
-    }
-
+  async function runFlowLocal() {
+    if (!characterId || !outfitId || !fullPrompt.trim()) return;
     setBusy(true);
     setError("");
     setMsg(
@@ -374,7 +377,7 @@ export default function GerarStudioPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Criação"
-        subtitle="Escolha o look → foto ou vídeo → ferramenta → execute. O Claude/agente gera na ferramenta escolhida."
+        subtitle="Escolha look → prompt → Enviar para Claude. Ele opera Tokfy, Flow ou outra ferramenta."
       />
 
       <div className="space-y-4">
@@ -405,38 +408,7 @@ export default function GerarStudioPage() {
           </div>
         </Panel>
 
-        <Panel title="2 · Ferramenta">
-          <p className="mb-3 text-xs text-[var(--muted)]">
-            Claude monta o pacote e opera a ferramenta (Computer Use) ou o
-            agente local abre o Flow no seu PC.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setTool("claude")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                tool === "claude"
-                  ? "bg-[var(--accent)] text-white"
-                  : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)]"
-              }`}
-            >
-              Claude → ferramenta
-            </button>
-            <button
-              type="button"
-              onClick={() => setTool("flow")}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                tool === "flow"
-                  ? "bg-[var(--accent)] text-white"
-                  : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)]"
-              }`}
-            >
-              Google Flow (PC local)
-            </button>
-          </div>
-        </Panel>
-
-        <Panel title="3 · Personagem">
+        <Panel title="2 · Personagem">
           {characters.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
               Nenhuma personagem.{" "}
@@ -482,7 +454,7 @@ export default function GerarStudioPage() {
           ) : null}
         </Panel>
 
-        <Panel title="4 · Look da área de roupas">
+        <Panel title="3 · Look">
           <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
             Escolha o look — toque no card (Peça ou Vestida). A lupa só amplia.
           </p>
@@ -594,7 +566,7 @@ export default function GerarStudioPage() {
         </Panel>
 
         <Panel
-          title="5 · Prompt (pode editar)"
+          title="4 · Prompt"
           description={
             selectedOutfit
               ? `Look: ${outfitLabel(selectedOutfit)} · ${kind === "image" ? "foto" : "vídeo"}`
@@ -634,11 +606,23 @@ export default function GerarStudioPage() {
           </div>
         </Panel>
 
-        <Panel title="6 · Executar comando">
-          <p className="mb-3 text-xs text-[var(--muted)]">
-            {tool === "claude"
-              ? "Copia o pacote para o Claude. Ele entra na ferramenta e gera foto ou vídeo."
-              : "No PC local abre o Google Flow com o prompt e as fotos."}
+        <Panel title="5 · Enviar para Claude">
+          <Field label="Onde o Claude deve gerar">
+            <select
+              className={inputClass}
+              value={target}
+              onChange={(e) =>
+                setTarget(e.target.value as "tokfy" | "flow" | "auto")
+              }
+            >
+              <option value="tokfy">Tokfy (vídeo + ChatGPT)</option>
+              <option value="flow">Google Flow</option>
+              <option value="auto">Claude escolhe</option>
+            </select>
+          </Field>
+          <p className="mb-3 mt-2 text-xs text-[var(--muted)]">
+            Copia o pacote (prompt + fotos + passos). Cole no Claude Desktop com
+            Computer Use — ele abre a ferramenta e executa.
           </p>
           <Button
             className="w-full"
@@ -646,18 +630,27 @@ export default function GerarStudioPage() {
             disabled={!characterId || !outfitId || !fullPrompt.trim()}
             onClick={() => void runCommand()}
           >
-            {tool === "claude" ? (
-              <>
-                <Bot size={16} />
-                Executar com Claude ({kind === "image" ? "foto" : "vídeo"})
-              </>
-            ) : (
-              <>
-                <MonitorPlay size={16} />
-                Executar no Flow ({kind === "image" ? "foto" : "vídeo"})
-              </>
-            )}
+            <Bot size={16} />
+            Enviar para Claude
           </Button>
+
+          <details className="mt-4 rounded-xl border border-[var(--line)] p-3">
+            <summary className="cursor-pointer text-xs font-medium text-[var(--muted)]">
+              Avançado: abrir Flow no PC (sem Claude)
+            </summary>
+            <p className="mt-2 text-[11px] text-[var(--muted)]">
+              Só funciona localmente com DICloak/Playwright instalado.
+            </p>
+            <Button
+              className="mt-2 w-full"
+              variant="secondary"
+              loading={busy}
+              disabled={!characterId || !outfitId || !fullPrompt.trim()}
+              onClick={() => void runFlowLocal()}
+            >
+              Abrir Flow no PC
+            </Button>
+          </details>
         </Panel>
 
         {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
@@ -699,7 +692,7 @@ export default function GerarStudioPage() {
         ) : null}
 
         {kind === "image" ? (
-          <Panel title="7 · Salvar still no look">
+          <Panel title="Salvar still no look">
             <p className="mb-3 text-[11px] text-[var(--muted)]">
               Se gerou fora, envie o still — grava em{" "}
               <strong>Ela vestida</strong>.

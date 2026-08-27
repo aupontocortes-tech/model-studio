@@ -17,6 +17,7 @@ export const api = {
       parse<{
         provider: string;
         browserAgentMode: string;
+        tokfyUrl?: string;
         browserTarget?: "dicloak" | "cdp" | "playwright";
         googleFlowUrl: string;
         kalodataUrl: string;
@@ -429,6 +430,7 @@ export const api = {
       outfitId: string;
       prompt?: string;
       kind?: "image" | "video";
+      target?: "tokfy" | "flow" | "auto";
       sceneId?: string;
       keepSceneFromPhoto?: boolean;
       movementId?: string;
@@ -438,6 +440,7 @@ export const api = {
       q.set("outfitId", opts.outfitId);
       if (opts.prompt) q.set("prompt", opts.prompt);
       if (opts.kind) q.set("kind", opts.kind);
+      if (opts.target) q.set("target", opts.target);
       if (opts.sceneId) q.set("sceneId", opts.sceneId);
       if (opts.keepSceneFromPhoto === false) q.set("keepSceneFromPhoto", "false");
       if (opts.movementId) q.set("movementId", opts.movementId);
@@ -445,7 +448,9 @@ export const api = {
         parse<{
           markdown: string;
           prompt: string;
+          tokfyUrl: string;
           flowUrl: string;
+          target: string;
           howToUse: string;
         }>(r),
       );

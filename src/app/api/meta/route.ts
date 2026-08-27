@@ -35,6 +35,7 @@ export async function GET() {
     browserAgentMode: env.browserAgentMode,
     browserTarget,
     googleFlowUrl: env.googleFlowUrl,
+    tokfyUrl: env.tokfyUrl,
     kalodataUrl: env.kalodataUrl,
     maxUploadBytes: env.maxUploadBytes,
     database: {

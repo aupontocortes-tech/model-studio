@@ -14,6 +14,7 @@ export function getEnv() {
     browserAgentMode: (process.env.BROWSER_AGENT_MODE || "assisted").toLowerCase(),
     googleFlowUrl:
       process.env.GOOGLE_FLOW_URL || "https://flow.google/",
+    tokfyUrl: process.env.TOKFY_URL || "https://tokfy.ai/app/inicio",
     kalodataUrl: process.env.KALODATA_URL || "https://www.kalodata.com/",
     maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES || 8_388_608),
     dataDir,
