@@ -188,7 +188,8 @@ export default function RoupasPage() {
           <div className="space-y-4">
             <Panel title="Peça e ela vestida">
               <p className="mb-3 text-[11px] text-[var(--muted)]">
-                Miniaturas — clique na foto para ampliar.
+                Miniaturas — clique para ampliar. Se a foto estiver no lado
+                errado, troque ou mova.
               </p>
               <div className="flex flex-wrap gap-4">
                 <div>
@@ -212,6 +213,22 @@ export default function RoupasPage() {
                       }, "Foto da peça atualizada.")
                     }
                   />
+                  {selected.imageUrl ? (
+                    <Button
+                      className="mt-2"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await api.studio.outfits.update(selectedId, {
+                            movePhoto: "pieceToWorn",
+                          });
+                        }, "Foto movida para Ela vestida.")
+                      }
+                    >
+                      → Vestida
+                    </Button>
+                  ) : null}
                 </div>
                 <div>
                   <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
@@ -234,8 +251,40 @@ export default function RoupasPage() {
                       }, "Foto dela vestida atualizada.")
                     }
                   />
+                  {selected.wornImageUrl ? (
+                    <Button
+                      className="mt-2"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await api.studio.outfits.update(selectedId, {
+                            movePhoto: "wornToPiece",
+                          });
+                        }, "Foto movida para Peça.")
+                      }
+                    >
+                      ← Peça
+                    </Button>
+                  ) : null}
                 </div>
               </div>
+              {(selected.imageUrl || selected.wornImageUrl) ? (
+                <Button
+                  className="mt-3"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await api.studio.outfits.update(selectedId, {
+                        swapPhotoSlots: true,
+                      });
+                    }, "Peça e Ela vestida trocadas de lado.")
+                  }
+                >
+                  Trocar de lado (Peça ↔ Vestida)
+                </Button>
+              ) : null}
             </Panel>
 
             <Panel title="Detalhes (opcional)">

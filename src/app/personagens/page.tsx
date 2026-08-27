@@ -682,6 +682,22 @@ export default function BibliotecaPersonagensPage() {
                           })
                         }
                       />
+                      {selectedLook.imageUrl ? (
+                        <Button
+                          className="mt-2"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await api.studio.outfits.update(selectedLook.id, {
+                                movePhoto: "pieceToWorn",
+                              });
+                            }, "Foto movida para Ela vestida.")
+                          }
+                        >
+                          → Vestida
+                        </Button>
+                      ) : null}
                     </div>
                     <div>
                       <p className="mb-1.5 text-[11px] font-medium text-[var(--muted)]">
@@ -703,8 +719,43 @@ export default function BibliotecaPersonagensPage() {
                           })
                         }
                       />
+                      {selectedLook.wornImageUrl ? (
+                        <Button
+                          className="mt-2"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await api.studio.outfits.update(selectedLook.id, {
+                                movePhoto: "wornToPiece",
+                              });
+                            }, "Foto movida para Peça.")
+                          }
+                        >
+                          ← Peça
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
+                  {(selectedLook.imageUrl || selectedLook.wornImageUrl) ? (
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await api.studio.outfits.update(selectedLook.id, {
+                            swapPhotoSlots: true,
+                          });
+                        }, "Peça e Ela vestida trocadas de lado.")
+                      }
+                    >
+                      Trocar de lado (Peça ↔ Vestida)
+                    </Button>
+                  ) : null}
+                  <p className="text-[11px] text-[var(--muted)]">
+                    Se a foto dela vestida caiu em Peça (ou o contrário), use os
+                    botões acima para corrigir.
+                  </p>
                   <input
                     className={inputClass}
                     placeholder="Nome (opcional)"
