@@ -7,6 +7,7 @@ import {
 import { jsonError, jsonOk, createId, nowIso } from "@/lib/studioCrud";
 import {
   buildCreativeDirectorPrompt,
+  buildOutfitTryOnPrompt,
   titleForSavedPrompt,
 } from "@/services/prompt/CreativeDirector";
 import {
@@ -40,10 +41,15 @@ export async function POST(request: Request) {
     kind?: StudioMediaKind;
     includeVoice?: boolean;
     keepSceneFromPhoto?: boolean;
+    /** Prompt de vestir look (virtual try-on). */
+    mode?: "default" | "tryOn";
+    /** Se o usuário editou o texto, grava esse bloco. */
+    editedPrompt?: string;
   };
 
   const now = nowIso();
   const kind: StudioMediaKind = body.kind === "image" ? "image" : "video";
+  const tryOn = body.mode === "tryOn" || (kind === "image" && Boolean(body.outfitId));
   let character = body.characterId
     ? await studioCharacterRepo.get(body.characterId)
     : undefined;
@@ -114,6 +120,12 @@ export async function POST(request: Request) {
     });
   }
 
+  if (tryOn && !outfit) {
+    return jsonError(
+      "Escolha um look da área de roupas para vestir nela.",
+    );
+  }
+
   const libraryScene = body.keepSceneFromPhoto
     ? undefined
     : body.sceneId
@@ -128,20 +140,37 @@ export async function POST(request: Request) {
       ? character.scenes.find((s) => s.id === body.characterSceneId)
       : undefined;
 
-  const built = buildCreativeDirectorPrompt({
-    character,
-    outfit,
-    scene: libraryScene || null,
-    libraryMovementPrompt: libMove?.prompt,
-    libraryScenePrompt:
-      pinnedLocalScene?.prompt ||
-      body.scenePrompt?.trim() ||
-      undefined,
-    extraNotes: body.extraNotes,
-    kind,
-    includeVoice: body.includeVoice !== false,
-    keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
-  });
+  const built = tryOn && outfit
+    ? (() => {
+        const fullPrompt =
+          body.editedPrompt?.trim() ||
+          buildOutfitTryOnPrompt({
+            character,
+            outfit,
+            movementPrompt: libMove?.prompt,
+            keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
+            scene: libraryScene || null,
+          });
+        return {
+          systemPrompt: "Outfit try-on",
+          userPrompt: fullPrompt,
+          fullPrompt,
+        };
+      })()
+    : buildCreativeDirectorPrompt({
+        character,
+        outfit,
+        scene: libraryScene || null,
+        libraryMovementPrompt: libMove?.prompt,
+        libraryScenePrompt:
+          pinnedLocalScene?.prompt ||
+          body.scenePrompt?.trim() ||
+          undefined,
+        extraNotes: body.extraNotes,
+        kind,
+        includeVoice: body.includeVoice !== false,
+        keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
+      });
 
   let saved: SavedStudioPrompt | undefined;
   if (body.save !== false) {
@@ -161,6 +190,7 @@ export async function POST(request: Request) {
             (pinnedLocalScene ? { name: pinnedLocalScene.name } : null) ||
             (body.keepSceneFromPhoto ? { name: "cenário da imagem" } : null),
           libMove ? { name: libMove.name } : null,
+          tryOn ? { name: "trocar look" } : null,
         ],
         kind,
       ),
@@ -176,6 +206,7 @@ export async function POST(request: Request) {
     ...built,
     saved,
     kind,
+    mode: tryOn ? "tryOn" : "default",
     characterId: character.id,
     characterPreview: {
       id: character.id,

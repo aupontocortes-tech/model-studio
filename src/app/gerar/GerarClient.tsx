@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/primitives";
 import { api } from "@/lib/clientApi";
 import { prepareImageFile } from "@/lib/prepareImage";
+import { buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton } from "@/components/studio/FilePickButton";
@@ -23,7 +24,7 @@ import {
   type StudioOutfit,
   type StudioScene,
 } from "@/domain/studioAssets";
-import { Copy, WandSparkles } from "lucide-react";
+import { Copy, RefreshCw, WandSparkles } from "lucide-react";
 
 export default function GerarStudioPage() {
   const search = useSearchParams();
@@ -42,6 +43,7 @@ export default function GerarStudioPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [fullPrompt, setFullPrompt] = useState("");
+  const [promptDirty, setPromptDirty] = useState(false);
 
   const selected = characters.find((c) => c.id === characterId);
 
@@ -62,11 +64,30 @@ export default function GerarStudioPage() {
     [scenes, selected],
   );
   const selectedOutfit = outfits.find((o) => o.id === outfitId);
+  const selectedMovement = selected?.movements.find((m) => m.id === movementId);
+  const selectedScene = scenes.find((s) => s.id === sceneId);
   const sceneFromPhotoUrl =
     selectedOutfit?.wornImageUrl ||
     selectedOutfit?.imageUrl ||
     selected?.bodyImageUrl ||
     selected?.faceImageUrl;
+
+  const tryOnTemplate = useMemo(() => {
+    if (!selected || !selectedOutfit) return "";
+    return buildOutfitTryOnPrompt({
+      character: selected,
+      outfit: selectedOutfit,
+      movementPrompt: selectedMovement?.prompt,
+      keepSceneFromPhoto,
+      scene: keepSceneFromPhoto ? null : selectedScene || null,
+    });
+  }, [
+    selected,
+    selectedOutfit,
+    selectedMovement,
+    keepSceneFromPhoto,
+    selectedScene,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -98,11 +119,38 @@ export default function GerarStudioPage() {
     setSceneId("");
     setKeepSceneFromPhoto(true);
     setIncludeVoice(true);
+    setPromptDirty(false);
+    setFullPrompt("");
   }, [characterId]);
+
+  useEffect(() => {
+    setPromptDirty(false);
+  }, [outfitId]);
+
+  useEffect(() => {
+    if (kind !== "image" || !tryOnTemplate) return;
+    if (promptDirty) return;
+    setFullPrompt(tryOnTemplate);
+  }, [tryOnTemplate, kind, promptDirty]);
+
+  function restoreProfessionalPrompt() {
+    if (!tryOnTemplate) {
+      setError("Escolha personagem e um look da área de roupas.");
+      return;
+    }
+    setPromptDirty(false);
+    setFullPrompt(tryOnTemplate);
+    setMsg("Prompt profissional de trocar look restaurado — você pode editar.");
+    setError("");
+  }
 
   async function generate() {
     if (!characterId) {
       setError("Escolha uma personagem na Biblioteca.");
+      return;
+    }
+    if (kind === "image" && !outfitId) {
+      setError("Escolha um look da área de roupas para vestir nela.");
       return;
     }
     setBusy(true);
@@ -118,13 +166,15 @@ export default function GerarStudioPage() {
         includeVoice,
         keepSceneFromPhoto,
         save: true,
+        mode: kind === "image" ? "tryOn" : "default",
+        editedPrompt:
+          kind === "image" && promptDirty ? fullPrompt : undefined,
       });
       setFullPrompt(r.fullPrompt);
+      setPromptDirty(false);
       setMsg(
         kind === "image"
-          ? outfitId
-            ? "Prompt pronto. Gere o still fora e envie abaixo — salva em Ela vestida deste look."
-            : "Prompt de imagem pronto — copie para gerar o still. Escolha um look para salvar o resultado nele."
+          ? "Prompt pronto (editável). Copie, gere a imagem fora e envie o still no look abaixo."
           : "Prompt de vídeo pronto — copie para a outra plataforma.",
       );
       const p = await api.studio.prompts.list();
@@ -173,26 +223,29 @@ export default function GerarStudioPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Criação"
-        subtitle="Monta o look em imagem. O app não grava vídeo — você copia o prompt e gera o vídeo em outra plataforma."
+        subtitle="Escolha o look → use o prompt profissional (editável) → gere a imagem fora → salve em Ela vestida."
       />
 
       <div className="space-y-4">
-        <Panel title="1 · Imagem para usar fora">
+        <Panel title="1 · Trocar look (imagem)">
           <p className="mb-3 text-xs leading-5 text-[var(--muted)]">
-            Gera prompt de still (ela vestida). Depois envie o resultado no look
-            escolhido. Vídeo fica para o Flow ou outra plataforma.
+            Prompt profissional já montado para vestir a roupa do guarda-roupa
+            nela. Você pode editar o texto antes de copiar.
           </p>
           <div className="flex gap-2">
             {(
               [
-                ["image", "Imagem"],
+                ["image", "Trocar look"],
                 ["video", "Prompt de vídeo"],
               ] as const
             ).map(([id, label]) => (
               <button
                 key={id}
                 type="button"
-                onClick={() => setKind(id)}
+                onClick={() => {
+                  setKind(id);
+                  setPromptDirty(false);
+                }}
                 className={`rounded-xl px-4 py-2 text-sm font-semibold ${
                   kind === id
                     ? "bg-[var(--accent)] text-white"
@@ -251,72 +304,66 @@ export default function GerarStudioPage() {
           ) : null}
         </Panel>
 
-        <Panel title="3 · Peças desta cena">
-          <div className="mb-4">
-            <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
-              Look — peça e ela vestida (miniaturas)
+        <Panel title="3 · Look da área de roupas">
+          <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
+            Escolha a peça — o prompt veste essa roupa nela
+          </p>
+          {wardrobe.length === 0 && otherOutfits.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">
+              Sem looks. Cadastre a peça em{" "}
+              <a className="text-[var(--accent)]" href="/personagens">
+                Biblioteca
+              </a>
+              .
             </p>
-            {wardrobe.length === 0 && otherOutfits.length === 0 ? (
-              <p className="text-sm text-[var(--muted)]">
-                Sem looks no banco. Cadastre a peça e a foto dela vestida na
-                personagem.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                <button
-                  type="button"
-                  onClick={() => setOutfitId("")}
-                  className={`flex aspect-square items-center justify-center rounded-xl border text-xs ${
-                    !outfitId
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] font-medium"
-                      : "border-dashed border-[var(--line)] text-[var(--muted)]"
-                  }`}
-                >
-                  Nenhuma
-                </button>
-                {wardrobe.map((o) => (
-                  <OutfitCard
-                    key={o.id}
-                    outfit={o}
-                    selected={outfitId === o.id}
-                    onSelect={() => setOutfitId(o.id)}
-                  />
-                ))}
-                {otherOutfits.map((o) => (
-                  <OutfitCard
-                    key={o.id}
-                    outfit={o}
-                    selected={outfitId === o.id}
-                    onSelect={() => setOutfitId(o.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-          <Field label={kind === "image" ? "Pose / movimento" : "Movimento"}>
-            <select
-              className={inputClass}
-              value={movementId}
-              onChange={(e) => setMovementId(e.target.value)}
-            >
-              <option value="">—</option>
-              {(selected?.movements || []).map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {wardrobe.map((o) => (
+                <OutfitCard
+                  key={o.id}
+                  outfit={o}
+                  selected={outfitId === o.id}
+                  onSelect={() => setOutfitId(o.id)}
+                />
               ))}
-            </select>
-          </Field>
-          <div className="mt-4">
-            <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
-              Cenário
-            </p>
+              {otherOutfits.map((o) => (
+                <OutfitCard
+                  key={o.id}
+                  outfit={o}
+                  selected={outfitId === o.id}
+                  onSelect={() => setOutfitId(o.id)}
+                />
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 space-y-3">
+            <Field label={kind === "image" ? "Pose / movimento (opcional)" : "Movimento"}>
+              <select
+                className={inputClass}
+                value={movementId}
+                onChange={(e) => {
+                  setMovementId(e.target.value);
+                  setPromptDirty(false);
+                }}
+              >
+                <option value="">Padrão profissional</option>
+                {(selected?.movements || []).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <p className="text-[13px] font-medium text-[var(--ink)]">Cenário</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => {
                   setKeepSceneFromPhoto(true);
                   setSceneId("");
+                  setPromptDirty(false);
                 }}
                 className={`overflow-hidden rounded-xl border text-left ${
                   keepSceneFromPhoto
@@ -340,7 +387,7 @@ export default function GerarStudioPage() {
                   Cenário da imagem dela
                 </p>
               </button>
-              {herScenes.map((s) => (
+              {[...herScenes, ...otherScenes].map((s) => (
                 <SceneCard
                   key={s.id}
                   scene={s}
@@ -348,111 +395,120 @@ export default function GerarStudioPage() {
                   onSelect={() => {
                     setKeepSceneFromPhoto(false);
                     setSceneId(s.id);
-                  }}
-                />
-              ))}
-              {otherScenes.map((s) => (
-                <SceneCard
-                  key={s.id}
-                  scene={s}
-                  selected={!keepSceneFromPhoto && sceneId === s.id}
-                  onSelect={() => {
-                    setKeepSceneFromPhoto(false);
-                    setSceneId(s.id);
+                    setPromptDirty(false);
                   }}
                 />
               ))}
             </div>
+
+            {selected && characterHasVoice(selected) && kind === "video" ? (
+              <label className="flex items-center gap-2 text-sm text-[var(--ink)]">
+                <input
+                  type="checkbox"
+                  checked={includeVoice}
+                  onChange={(e) => setIncludeVoice(e.target.checked)}
+                />
+                Incluir voz de{" "}
+                {selected.voice?.name || selected.identity.displayName}
+              </label>
+            ) : null}
           </div>
-          {selected && characterHasVoice(selected) ? (
-            <label className="mt-3 flex items-center gap-2 text-sm text-[var(--ink)]">
-              <input
-                type="checkbox"
-                checked={includeVoice}
-                onChange={(e) => setIncludeVoice(e.target.checked)}
-              />
-              Incluir voz de{" "}
-              {selected.voice?.name || selected.identity.displayName}
-            </label>
-          ) : null}
         </Panel>
 
-        <Button
-          className="w-full"
-          loading={busy}
-          disabled={!characterId}
-          onClick={() => void generate()}
+        <Panel
+          title="4 · Prompt profissional (editável)"
+          description={
+            selectedOutfit
+              ? `Look: ${outfitLabel(selectedOutfit)} — edite à vontade antes de copiar.`
+              : "Selecione um look acima para montar o prompt."
+          }
         >
-          <WandSparkles size={16} />
-          Gerar prompt de {kind === "image" ? "imagem" : "vídeo"}
-        </Button>
-        {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
-        {msg ? (
-          <p className="text-xs text-[var(--success-text)]">{msg}</p>
-        ) : null}
-
-        {fullPrompt ? (
-          <Panel title="Resultado">
-            <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-[var(--line)] bg-[#0b0c10] p-3 text-[11px] leading-4 text-[var(--muted)]">
-              {fullPrompt}
-            </pre>
+          <textarea
+            className={`${inputClass} min-h-[280px] font-mono text-[11px] leading-4`}
+            value={fullPrompt}
+            placeholder="Escolha personagem + look para carregar o prompt profissional de vestir a roupa nela…"
+            onChange={(e) => {
+              setFullPrompt(e.target.value);
+              setPromptDirty(true);
+            }}
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
             <Button
-              className="mt-3"
               variant="secondary"
+              disabled={!tryOnTemplate}
+              onClick={restoreProfessionalPrompt}
+            >
+              <RefreshCw size={14} />
+              Restaurar prompt profissional
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!fullPrompt.trim()}
               onClick={() =>
                 void navigator.clipboard
                   .writeText(fullPrompt)
-                  .then(() => setMsg("Copiado."))
+                  .then(() => setMsg("Prompt copiado."))
               }
             >
               <Copy size={14} />
               Copiar
             </Button>
+            <Button
+              loading={busy}
+              disabled={!characterId || (kind === "image" && !outfitId)}
+              onClick={() => void generate()}
+            >
+              <WandSparkles size={16} />
+              {kind === "image" ? "Salvar este prompt" : "Gerar prompt de vídeo"}
+            </Button>
+          </div>
+        </Panel>
 
-            {kind === "image" ? (
-              <div className="mt-4 space-y-2 rounded-xl border border-dashed border-[var(--line)] p-3">
-                <p className="text-xs font-medium text-[var(--ink)]">
-                  Salvar still no look
-                  {selectedOutfit
-                    ? ` · ${outfitLabel(selectedOutfit)}`
-                    : " · escolha um look acima"}
-                </p>
-                <p className="text-[11px] text-[var(--muted)]">
-                  Depois de gerar a imagem fora, envie aqui. Vai direto para Ela
-                  vestida na Biblioteca.
-                </p>
-                {selectedOutfit?.wornImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={selectedOutfit.wornImageUrl}
-                    alt="Ela vestida"
-                    className="h-24 w-24 rounded-lg object-cover"
-                  />
-                ) : null}
-                <FilePickButton
-                  accept="image/*,.heic,.heif"
-                  label={
-                    selectedOutfit?.wornImageUrl
-                      ? "Trocar still no look"
-                      : "Enviar still gerado"
-                  }
-                  disabled={busy || !outfitId}
-                  onFile={(f) => void saveStillToLook(f)}
-                />
-              </div>
+        {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
+        {msg ? (
+          <p className="text-xs text-[var(--success-text)]">{msg}</p>
+        ) : null}
+
+        {kind === "image" ? (
+          <Panel title="5 · Depois de gerar a imagem">
+            <p className="mb-3 text-[11px] text-[var(--muted)]">
+              Cole o prompt no gerador (Flow etc.), baixe o still e envie aqui —
+              grava em <strong>Ela vestida</strong> deste look.
+            </p>
+            {selectedOutfit?.wornImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={selectedOutfit.wornImageUrl}
+                alt="Ela vestida"
+                className="mb-3 h-24 w-24 rounded-lg object-cover"
+              />
             ) : null}
+            <FilePickButton
+              accept="image/*,.heic,.heif"
+              label={
+                selectedOutfit?.wornImageUrl
+                  ? "Trocar still no look"
+                  : "Enviar still gerado"
+              }
+              disabled={busy || !outfitId}
+              onFile={(f) => void saveStillToLook(f)}
+            />
           </Panel>
         ) : null}
 
         {saved.length > 0 ? (
-          <Panel title="Últimos">
+          <Panel title="Últimos prompts">
             <ul className="space-y-1 text-sm">
               {saved.slice(0, 5).map((p) => (
                 <li key={p.id}>
                   <button
                     type="button"
                     className="w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--panel-elevated)]"
-                    onClick={() => setFullPrompt(p.fullPrompt)}
+                    onClick={() => {
+                      setFullPrompt(p.fullPrompt);
+                      setPromptDirty(true);
+                      if (p.kind) setKind(p.kind);
+                    }}
                   >
                     {p.title}
                   </button>
