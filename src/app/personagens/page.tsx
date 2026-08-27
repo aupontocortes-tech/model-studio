@@ -32,6 +32,7 @@ export default function BibliotecaPersonagensPage() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [storageWarning, setStorageWarning] = useState("");
   const voiceRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -83,8 +84,13 @@ export default function BibliotecaPersonagensPage() {
       api.studio.scenes.list(),
     ]);
     if (cRes.status !== "fulfilled") throw cRes.reason;
+    const listed = cRes.value as {
+      characters: StudioCharacter[];
+      storageWarning?: string;
+    };
+    if (listed.storageWarning) setStorageWarning(listed.storageWarning);
     setList((prev) =>
-      cRes.value.characters.map((incoming) => {
+      listed.characters.map((incoming) => {
         const old = prev.find((p) => p.id === incoming.id);
         return {
           ...incoming,
@@ -117,8 +123,8 @@ export default function BibliotecaPersonagensPage() {
         }),
       );
     }
-    if (!selectedId && cRes.value.characters[0]) {
-      setSelectedId(cRes.value.characters[0].id);
+    if (!selectedId && listed.characters[0]) {
+      setSelectedId(listed.characters[0].id);
     }
   }, [selectedId]);
 
@@ -127,6 +133,30 @@ export default function BibliotecaPersonagensPage() {
       setError(e instanceof Error ? e.message : "Erro"),
     );
   }, [reload]);
+
+  useEffect(() => {
+    void fetch("/api/meta")
+      .then((r) => r.json())
+      .then((data) => {
+        const db = data?.database as
+          | { mode?: string; message?: string; ping?: { ok?: boolean } }
+          | undefined;
+        if (!db) return;
+        if (db.mode === "local-json") {
+          setStorageWarning(
+            db.message ||
+              "Persistência temporária: configure DATABASE_URL (Neon) na Vercel, senão personagem e foto somem.",
+          );
+        } else if (db.ping && db.ping.ok === false) {
+          setStorageWarning(
+            `Neon não conecta: ${db.message || "confira DATABASE_URL e Redeploy."}`,
+          );
+        } else {
+          setStorageWarning("");
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const current = list.find((c) => c.id === selectedId);
@@ -228,6 +258,8 @@ export default function BibliotecaPersonagensPage() {
       const fd = new FormData();
       fd.set("file", prepared);
       fd.set("kind", kind);
+      fd.set("displayName", name || selected?.identity.displayName || "");
+      fd.set("identityPrompt", identityPrompt || selected?.identity.identityPrompt || "");
       const res = await fetch(`/api/studio/characters/${selectedId}/upload`, {
         method: "POST",
         body: fd,
@@ -258,6 +290,7 @@ export default function BibliotecaPersonagensPage() {
           ),
         );
       }
+      setError("");
       setMsg(
         kind === "face"
           ? "Foto do rosto ok."
@@ -266,6 +299,7 @@ export default function BibliotecaPersonagensPage() {
             : "Áudio da voz ok.",
       );
     } catch (e) {
+      setMsg("");
       setError(e instanceof Error ? e.message : "Falha no envio da foto.");
     } finally {
       setBusy(false);
@@ -383,6 +417,11 @@ export default function BibliotecaPersonagensPage() {
 
   return (
     <div>
+      {storageWarning ? (
+        <div className="mb-4 rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-4 py-3 text-sm text-[var(--danger)]">
+          {storageWarning}
+        </div>
+      ) : null}
       <PageHeader
         title="Biblioteca"
         subtitle="Banco da personagem + roupas e cenários reutilizáveis. Depois é só juntar na criação."
