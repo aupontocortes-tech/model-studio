@@ -1,7 +1,10 @@
 import { jsonError, jsonOk } from "@/lib/api";
 import { getEnv } from "@/lib/env";
 import { normalizeStudioCharacter, outfitLabel } from "@/domain/studioAssets";
-import { buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
+import {
+  buildCreativeDirectorPrompt,
+  buildOutfitTryOnPrompt,
+} from "@/services/prompt/CreativeDirector";
 import {
   materializeReferenceUrls,
   startBrowserAgentJob,
@@ -17,13 +20,13 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 /**
- * Inicia o agente no Google Flow com prompt + fotos da personagem/look.
- * No PC local (DiCloak/Playwright). Na Vercel serverless não roda navegador.
+ * Comando único: personagem + look + foto|vídeo → abre a ferramenta (Flow)
+ * via agente local. Na Vercel retorna 503 (use pacote Claude).
  */
 export async function POST(request: Request) {
   if (process.env.VERCEL) {
     return jsonError(
-      "Gerar no Flow pelo agente só funciona no PC local (DiCloak/Playwright). Na Vercel use Copiar pacote Claude e rode o Computer Use aí.",
+      "Executar no navegador só no PC local (DiCloak). Na nuvem use o botão Claude — ele gera o pacote para o Computer Use.",
       503,
     );
   }
@@ -35,12 +38,15 @@ export async function POST(request: Request) {
     keepSceneFromPhoto?: boolean;
     characterMovementId?: string;
     prompt?: string;
+    kind?: "image" | "video";
+    tool?: "flow" | "claude";
   };
 
   const characterId = body.characterId?.trim();
   const outfitId = body.outfitId?.trim();
+  const kind = body.kind === "video" ? "video" : "image";
   if (!characterId) return jsonError("Escolha a personagem.");
-  if (!outfitId) return jsonError("Escolha o look da área de roupas.");
+  if (!outfitId) return jsonError("Escolha o look.");
 
   const raw = await studioCharacterRepo.get(characterId);
   if (!raw) return jsonError("Personagem não encontrada.", 404);
@@ -58,13 +64,23 @@ export async function POST(request: Request) {
 
   const prompt =
     body.prompt?.trim() ||
-    buildOutfitTryOnPrompt({
-      character,
-      outfit,
-      movementPrompt: movement?.prompt,
-      keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
-      scene,
-    });
+    (kind === "image"
+      ? buildOutfitTryOnPrompt({
+          character,
+          outfit,
+          movementPrompt: movement?.prompt,
+          keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
+          scene,
+        })
+      : buildCreativeDirectorPrompt({
+          character,
+          outfit,
+          scene,
+          libraryMovementPrompt: movement?.prompt,
+          kind: "video",
+          keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
+          includeVoice: true,
+        }).fullPrompt);
 
   const referenceUrls = [
     character.faceImageUrl,
@@ -74,13 +90,19 @@ export async function POST(request: Request) {
   ].filter((u): u is string => Boolean(u));
 
   const referencePaths = await materializeReferenceUrls(referenceUrls);
+  const sourcePaths = await materializeReferenceUrls(
+    [outfit.wornImageUrl || character.bodyImageUrl || character.faceImageUrl].filter(
+      (u): u is string => Boolean(u),
+    ),
+  );
   const env = getEnv();
 
   const job = await startBrowserAgentJob({
-    kind: "google_flow_image",
+    kind: kind === "video" ? "google_flow_video" : "google_flow_image",
     prompt,
-    productName: `${character.identity.displayName} · ${outfitLabel(outfit)}`,
-    referencePaths,
+    productName: `${character.identity.displayName} · ${outfitLabel(outfit)} · ${kind}`,
+    referencePaths: kind === "image" ? referencePaths : [],
+    sourceImagePath: kind === "video" ? sourcePaths[0] : undefined,
     headless: false,
   });
 
@@ -88,10 +110,14 @@ export async function POST(request: Request) {
     {
       job,
       prompt,
-      referenceCount: referencePaths.length,
+      kind,
+      tool: "flow",
+      referenceCount: kind === "image" ? referencePaths.length : sourcePaths.length,
       flowUrl: env.googleFlowUrl,
       tip:
-        "O navegador abre o Flow com o prompt. Em modo assisted, clique em gerar e salve a imagem — depois use Salvar still no look.",
+        kind === "image"
+          ? "Flow aberto para FOTO. Revise, gere e salve — depois Salvar no look."
+          : "Flow aberto para VÍDEO (usa a foto dela vestida se existir). Gere no Flow e baixe o resultado.",
     },
     { status: 201 },
   );

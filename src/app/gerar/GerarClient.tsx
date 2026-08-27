@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/primitives";
 import { api } from "@/lib/clientApi";
 import { prepareImageFile } from "@/lib/prepareImage";
-import { buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
+import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton } from "@/components/studio/FilePickButton";
@@ -24,7 +24,7 @@ import {
   type StudioOutfit,
   type StudioScene,
 } from "@/domain/studioAssets";
-import { Copy, Bot, MonitorPlay, RefreshCw, WandSparkles } from "lucide-react";
+import { Copy, Bot, MonitorPlay, RefreshCw } from "lucide-react";
 
 type AgentJobView = {
   id: string;
@@ -52,6 +52,7 @@ export default function GerarStudioPage() {
   const [msg, setMsg] = useState("");
   const [fullPrompt, setFullPrompt] = useState("");
   const [promptDirty, setPromptDirty] = useState(false);
+  const [tool, setTool] = useState<"flow" | "claude">("claude");
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -83,6 +84,17 @@ export default function GerarStudioPage() {
 
   const tryOnTemplate = useMemo(() => {
     if (!selected || !selectedOutfit) return "";
+    if (kind === "video") {
+      return buildCreativeDirectorPrompt({
+        character: selected,
+        outfit: selectedOutfit,
+        scene: keepSceneFromPhoto ? null : selectedScene || null,
+        libraryMovementPrompt: selectedMovement?.prompt,
+        kind: "video",
+        keepSceneFromPhoto,
+        includeVoice,
+      }).fullPrompt;
+    }
     return buildOutfitTryOnPrompt({
       character: selected,
       outfit: selectedOutfit,
@@ -96,6 +108,8 @@ export default function GerarStudioPage() {
     selectedMovement,
     keepSceneFromPhoto,
     selectedScene,
+    kind,
+    includeVoice,
   ]);
 
   useEffect(() => {
@@ -240,13 +254,16 @@ export default function GerarStudioPage() {
         characterId,
         outfitId,
         prompt: fullPrompt || undefined,
+        kind,
         sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
         keepSceneFromPhoto,
         movementId: movementId || undefined,
       });
       await navigator.clipboard.writeText(pack.markdown);
       setMsg(
-        "Pacote Claude copiado — cole no Claude (Computer Use) para gerar no Flow.",
+        kind === "video"
+          ? "Pacote Claude (vídeo) copiado — cole no Claude para ele gerar na ferramenta."
+          : "Pacote Claude (foto) copiado — cole no Claude para ele gerar na ferramenta.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao montar pacote Claude.");
@@ -255,35 +272,47 @@ export default function GerarStudioPage() {
     }
   }
 
-  async function startFlowAgent() {
+  async function runCommand() {
     if (!characterId || !outfitId) {
-      setError("Escolha personagem e look primeiro.");
+      setError("Escolha a personagem e o look.");
       return;
     }
     if (!fullPrompt.trim()) {
-      setError("O prompt está vazio.");
+      setError("Escreva ou restaure o prompt.");
       return;
     }
+
+    if (tool === "claude") {
+      await copyClaudePack();
+      return;
+    }
+
     setBusy(true);
     setError("");
-    setMsg("Abrindo Flow com o agente…");
+    setMsg(
+      kind === "video"
+        ? "Enviando comando de VÍDEO ao Flow…"
+        : "Enviando comando de FOTO ao Flow…",
+    );
     try {
       const { job, tip, referenceCount } = await api.studio.tryOnFlow({
         characterId,
         outfitId,
         prompt: fullPrompt,
+        kind,
+        tool: "flow",
         sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
         keepSceneFromPhoto,
         characterMovementId: movementId || undefined,
       });
       setAgentJob(job);
       setMsg(
-        `${tip} (${referenceCount} referência(s)). Job ${job.id.slice(0, 8)}…`,
+        `${tip} (${referenceCount} ref.). Acompanhe o status abaixo.`,
       );
       void pollAgentJob(job.id);
     } catch (e) {
       setMsg("");
-      setError(e instanceof Error ? e.message : "Falha ao iniciar o Flow.");
+      setError(e instanceof Error ? e.message : "Falha ao executar o comando.");
     } finally {
       setBusy(false);
     }
@@ -345,20 +374,16 @@ export default function GerarStudioPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="Criação"
-        subtitle="Escolha o look → use o prompt profissional (editável) → gere a imagem fora → salve em Ela vestida."
+        subtitle="Escolha o look → foto ou vídeo → ferramenta → execute. O Claude/agente gera na ferramenta escolhida."
       />
 
       <div className="space-y-4">
-        <Panel title="1 · Trocar look (imagem)">
-          <p className="mb-3 text-xs leading-5 text-[var(--muted)]">
-            Prompt profissional já montado para vestir a roupa do guarda-roupa
-            nela. Você pode editar o texto antes de copiar.
-          </p>
-          <div className="flex gap-2">
+        <Panel title="1 · O que gerar">
+          <div className="flex flex-wrap gap-2">
             {(
               [
-                ["image", "Trocar look"],
-                ["video", "Prompt de vídeo"],
+                ["image", "Foto (still)"],
+                ["video", "Vídeo"],
               ] as const
             ).map(([id, label]) => (
               <button
@@ -380,7 +405,38 @@ export default function GerarStudioPage() {
           </div>
         </Panel>
 
-        <Panel title="2 · Personagem">
+        <Panel title="2 · Ferramenta">
+          <p className="mb-3 text-xs text-[var(--muted)]">
+            Claude monta o pacote e opera a ferramenta (Computer Use) ou o
+            agente local abre o Flow no seu PC.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setTool("claude")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                tool === "claude"
+                  ? "bg-[var(--accent)] text-white"
+                  : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)]"
+              }`}
+            >
+              Claude → ferramenta
+            </button>
+            <button
+              type="button"
+              onClick={() => setTool("flow")}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold ${
+                tool === "flow"
+                  ? "bg-[var(--accent)] text-white"
+                  : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)]"
+              }`}
+            >
+              Google Flow (PC local)
+            </button>
+          </div>
+        </Panel>
+
+        <Panel title="3 · Personagem">
           {characters.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
               Nenhuma personagem.{" "}
@@ -426,9 +482,9 @@ export default function GerarStudioPage() {
           ) : null}
         </Panel>
 
-        <Panel title="3 · Look da área de roupas">
+        <Panel title="4 · Look da área de roupas">
           <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
-            Escolha a peça — o prompt veste essa roupa nela
+            Escolha o look — o comando usa essa roupa
           </p>
           {wardrobe.length === 0 && otherOutfits.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
@@ -538,17 +594,17 @@ export default function GerarStudioPage() {
         </Panel>
 
         <Panel
-          title="4 · Prompt profissional (editável)"
+          title="5 · Prompt (pode editar)"
           description={
             selectedOutfit
-              ? `Look: ${outfitLabel(selectedOutfit)} — edite à vontade antes de copiar.`
-              : "Selecione um look acima para montar o prompt."
+              ? `Look: ${outfitLabel(selectedOutfit)} · ${kind === "image" ? "foto" : "vídeo"}`
+              : "Selecione um look para montar o prompt."
           }
         >
           <textarea
-            className={`${inputClass} min-h-[280px] font-mono text-[11px] leading-4`}
+            className={`${inputClass} min-h-[240px] font-mono text-[11px] leading-4`}
             value={fullPrompt}
-            placeholder="Escolha personagem + look para carregar o prompt profissional de vestir a roupa nela…"
+            placeholder="Escolha personagem + look — o prompt aparece aqui e você pode mudar…"
             onChange={(e) => {
               setFullPrompt(e.target.value);
               setPromptDirty(true);
@@ -561,7 +617,7 @@ export default function GerarStudioPage() {
               onClick={restoreProfessionalPrompt}
             >
               <RefreshCw size={14} />
-              Restaurar prompt profissional
+              Restaurar prompt
             </Button>
             <Button
               variant="secondary"
@@ -573,35 +629,35 @@ export default function GerarStudioPage() {
               }
             >
               <Copy size={14} />
-              Copiar prompt
-            </Button>
-            <Button
-              variant="secondary"
-              loading={busy}
-              disabled={!characterId || !outfitId}
-              onClick={() => void copyClaudePack()}
-            >
-              <Bot size={14} />
-              Copiar pacote Claude
-            </Button>
-            <Button
-              loading={busy}
-              disabled={!characterId || !outfitId || !fullPrompt.trim()}
-              onClick={() => void startFlowAgent()}
-            >
-              <MonitorPlay size={16} />
-              Gerar no Flow
-            </Button>
-            <Button
-              variant="ghost"
-              loading={busy}
-              disabled={!characterId || (kind === "image" && !outfitId)}
-              onClick={() => void generate()}
-            >
-              <WandSparkles size={16} />
-              {kind === "image" ? "Salvar este prompt" : "Gerar prompt de vídeo"}
+              Só copiar prompt
             </Button>
           </div>
+        </Panel>
+
+        <Panel title="6 · Executar comando">
+          <p className="mb-3 text-xs text-[var(--muted)]">
+            {tool === "claude"
+              ? "Copia o pacote para o Claude. Ele entra na ferramenta e gera foto ou vídeo."
+              : "No PC local abre o Google Flow com o prompt e as fotos."}
+          </p>
+          <Button
+            className="w-full"
+            loading={busy}
+            disabled={!characterId || !outfitId || !fullPrompt.trim()}
+            onClick={() => void runCommand()}
+          >
+            {tool === "claude" ? (
+              <>
+                <Bot size={16} />
+                Executar com Claude ({kind === "image" ? "foto" : "vídeo"})
+              </>
+            ) : (
+              <>
+                <MonitorPlay size={16} />
+                Executar no Flow ({kind === "image" ? "foto" : "vídeo"})
+              </>
+            )}
+          </Button>
         </Panel>
 
         {error ? <p className="text-xs text-[var(--danger)]">{error}</p> : null}
@@ -610,7 +666,7 @@ export default function GerarStudioPage() {
         ) : null}
 
         {agentJob ? (
-          <Panel title="Agente Flow / Claude">
+          <Panel title="Status do comando">
             <p className="mb-2 text-xs text-[var(--muted)]">
               Status: <strong>{agentJob.status}</strong>
               {agentJob.error ? ` — ${agentJob.error}` : ""}
@@ -625,30 +681,27 @@ export default function GerarStudioPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={agentJob.resultImageUrl}
-                  alt="Resultado Flow"
+                  alt="Resultado"
                   className="h-40 w-28 rounded-lg object-cover"
                 />
-                <Button
-                  loading={busy}
-                  disabled={!outfitId}
-                  onClick={() => void saveAgentResultToLook()}
-                >
-                  Salvar no look (Ela vestida)
-                </Button>
+                {kind === "image" ? (
+                  <Button
+                    loading={busy}
+                    disabled={!outfitId}
+                    onClick={() => void saveAgentResultToLook()}
+                  >
+                    Salvar no look (Ela vestida)
+                  </Button>
+                ) : null}
               </div>
-            ) : (
-              <p className="text-[11px] text-[var(--muted)]">
-                No PC local com DiCloak: o Flow abre sozinho. Na Vercel use
-                só o pacote Claude (Computer Use).
-              </p>
-            )}
+            ) : null}
           </Panel>
         ) : null}
 
         {kind === "image" ? (
-          <Panel title="5 · Depois de gerar a imagem">
+          <Panel title="7 · Salvar still no look">
             <p className="mb-3 text-[11px] text-[var(--muted)]">
-              Se gerou fora (Claude/Flow), envie o still aqui — grava em{" "}
+              Se gerou fora, envie o still — grava em{" "}
               <strong>Ela vestida</strong>.
             </p>
             {selectedOutfit?.wornImageUrl ? (

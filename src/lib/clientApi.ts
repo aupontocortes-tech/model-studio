@@ -393,10 +393,12 @@ export const api = {
           }>(r),
         ),
     },
-    tryOnFlow: (body: {
+      tryOnFlow: (body: {
       characterId: string;
       outfitId: string;
       prompt?: string;
+      kind?: "image" | "video";
+      tool?: "flow" | "claude";
       sceneId?: string;
       keepSceneFromPhoto?: boolean;
       characterMovementId?: string;
@@ -416,6 +418,7 @@ export const api = {
             error?: string;
           };
           prompt: string;
+          kind?: string;
           referenceCount: number;
           flowUrl: string;
           tip: string;
@@ -425,6 +428,7 @@ export const api = {
       characterId: string;
       outfitId: string;
       prompt?: string;
+      kind?: "image" | "video";
       sceneId?: string;
       keepSceneFromPhoto?: boolean;
       movementId?: string;
@@ -433,6 +437,7 @@ export const api = {
       q.set("characterId", opts.characterId);
       q.set("outfitId", opts.outfitId);
       if (opts.prompt) q.set("prompt", opts.prompt);
+      if (opts.kind) q.set("kind", opts.kind);
       if (opts.sceneId) q.set("sceneId", opts.sceneId);
       if (opts.keepSceneFromPhoto === false) q.set("keepSceneFromPhoto", "false");
       if (opts.movementId) q.set("movementId", opts.movementId);

@@ -4,7 +4,7 @@ import {
   CLAUDE_OPERATOR_SYSTEM_PROMPT,
 } from "@/services/claude/operatorPrompt";
 import { normalizeStudioCharacter, outfitLabel } from "@/domain/studioAssets";
-import { buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
+import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
 import {
   studioCharacterRepo,
   studioOutfitRepo,
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
   const keepSceneFromPhoto = url.searchParams.get("keepSceneFromPhoto") !== "false";
   const movementId = url.searchParams.get("movementId")?.trim();
   const editedPrompt = url.searchParams.get("prompt")?.trim();
+  const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
 
   if (!characterId) {
     return jsonError("characterId obrigatório.");
@@ -58,13 +59,23 @@ export async function GET(request: Request) {
 
   const prompt =
     editedPrompt ||
-    buildOutfitTryOnPrompt({
-      character,
-      outfit,
-      movementPrompt: movement?.prompt,
-      keepSceneFromPhoto,
-      scene,
-    });
+    (kind === "video"
+      ? buildCreativeDirectorPrompt({
+          character,
+          outfit,
+          scene,
+          libraryMovementPrompt: movement?.prompt,
+          kind: "video",
+          keepSceneFromPhoto,
+          includeVoice: true,
+        }).fullPrompt
+      : buildOutfitTryOnPrompt({
+          character,
+          outfit,
+          movementPrompt: movement?.prompt,
+          keepSceneFromPhoto,
+          scene,
+        }));
 
   const env = getEnv();
   const baseUrl = requestBaseUrl(request);
@@ -85,25 +96,36 @@ export async function GET(request: Request) {
   ].filter(Boolean);
 
   const markdown = [
-    "# Pacote Claude — Trocar look (try-on)",
+    `# Pacote Claude — ${kind === "video" ? "Vídeo" : "Trocar look (foto)"}`,
     "",
     CLAUDE_OPERATOR_SYSTEM_PROMPT,
     "",
     "---",
     "",
     `## Trabalho atual`,
+    `- Tipo: ${kind === "video" ? "VÍDEO" : "FOTO (still)"}`,
     `- App: ${baseUrl}/gerar?character=${character.id}`,
     `- Personagem: ${character.identity.displayName} (\`${character.id}\`)`,
     `- Look: ${outfitLabel(outfit)} (\`${outfit.id}\`)`,
-    `- Flow: ${env.googleFlowUrl}`,
+    `- Ferramenta: ${env.googleFlowUrl}`,
     "",
     "## Missão",
-    "1. Abra o perfil Flow no DICloak (ou Computer Use na janela já aberta).",
-    "2. Vá para https://flow.google/",
-    "3. Cole o PROMPT abaixo.",
-    "4. Anexe as referências (rosto, corpo, peça).",
-    "5. Gere a imagem still 9:16.",
-    "6. Baixe o still e no Model Studeo use **Enviar still gerado** no look (Ela vestida).",
+    kind === "video"
+      ? [
+          "1. Abra o perfil Flow no DICloak (ou Computer Use).",
+          "2. Vá para https://flow.google/",
+          "3. Use a foto dela vestida (se houver) como frame inicial.",
+          "4. Cole o PROMPT de vídeo abaixo e gere.",
+          "5. Baixe o vídeo e avise o usuário.",
+        ].join("\n")
+      : [
+          "1. Abra o perfil Flow no DICloak (ou Computer Use).",
+          "2. Vá para https://flow.google/",
+          "3. Cole o PROMPT abaixo.",
+          "4. Anexe as referências (rosto, corpo, peça).",
+          "5. Gere o still 9:16.",
+          "6. Baixe e no Model Studeo use **Enviar still gerado** (Ela vestida).",
+        ].join("\n"),
     "",
     "## Referências",
     refs.length ? refs.join("\n") : "- (sem fotos — complete o banco primeiro)",
