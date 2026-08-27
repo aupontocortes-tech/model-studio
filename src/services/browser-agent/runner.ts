@@ -180,7 +180,11 @@ export async function resolveLocalPathsFromUrls(
 
   for (const url of urls) {
     if (!url) continue;
-    if (url.startsWith("data:")) continue;
+    if (url.startsWith("data:")) {
+      const materialized = await materializeDataUrl(url);
+      if (materialized) paths.push(materialized);
+      continue;
+    }
     const marker = "/api/files/";
     const idx = url.indexOf(marker);
     if (idx >= 0) {
@@ -189,4 +193,33 @@ export async function resolveLocalPathsFromUrls(
     }
   }
   return paths;
+}
+
+/** Grava data URL em arquivo temporário para o Playwright enviar ao Flow. */
+export async function materializeDataUrl(
+  dataUrl: string,
+): Promise<string | null> {
+  const match = /^data:([^;]+);base64,(.+)$/i.exec(dataUrl);
+  if (!match) return null;
+  const mime = match[1].toLowerCase();
+  const ext =
+    mime.includes("png")
+      ? ".png"
+      : mime.includes("webp")
+        ? ".webp"
+        : mime.includes("gif")
+          ? ".gif"
+          : ".jpg";
+  const { uploadDir } = getEnv();
+  const dir = path.join(uploadDir, "tmp-refs");
+  await fs.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, `${createId("ref")}${ext}`);
+  await fs.writeFile(filePath, Buffer.from(match[2], "base64"));
+  return filePath;
+}
+
+export async function materializeReferenceUrls(
+  urls: string[],
+): Promise<string[]> {
+  return resolveLocalPathsFromUrls(urls.filter(Boolean));
 }

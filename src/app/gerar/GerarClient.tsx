@@ -24,7 +24,15 @@ import {
   type StudioOutfit,
   type StudioScene,
 } from "@/domain/studioAssets";
-import { Copy, RefreshCw, WandSparkles } from "lucide-react";
+import { Copy, Bot, MonitorPlay, RefreshCw, WandSparkles } from "lucide-react";
+
+type AgentJobView = {
+  id: string;
+  status: string;
+  logs: string[];
+  resultImageUrl?: string;
+  error?: string;
+};
 
 export default function GerarStudioPage() {
   const search = useSearchParams();
@@ -44,6 +52,7 @@ export default function GerarStudioPage() {
   const [msg, setMsg] = useState("");
   const [fullPrompt, setFullPrompt] = useState("");
   const [promptDirty, setPromptDirty] = useState(false);
+  const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
 
@@ -213,6 +222,119 @@ export default function GerarStudioPage() {
       );
     } catch (e) {
       setMsg("");
+      setError(e instanceof Error ? e.message : "Falha ao salvar no look.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyClaudePack() {
+    if (!characterId || !outfitId) {
+      setError("Escolha personagem e look primeiro.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const pack = await api.studio.claudePack({
+        characterId,
+        outfitId,
+        prompt: fullPrompt || undefined,
+        sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
+        keepSceneFromPhoto,
+        movementId: movementId || undefined,
+      });
+      await navigator.clipboard.writeText(pack.markdown);
+      setMsg(
+        "Pacote Claude copiado — cole no Claude (Computer Use) para gerar no Flow.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao montar pacote Claude.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startFlowAgent() {
+    if (!characterId || !outfitId) {
+      setError("Escolha personagem e look primeiro.");
+      return;
+    }
+    if (!fullPrompt.trim()) {
+      setError("O prompt está vazio.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setMsg("Abrindo Flow com o agente…");
+    try {
+      const { job, tip, referenceCount } = await api.studio.tryOnFlow({
+        characterId,
+        outfitId,
+        prompt: fullPrompt,
+        sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
+        keepSceneFromPhoto,
+        characterMovementId: movementId || undefined,
+      });
+      setAgentJob(job);
+      setMsg(
+        `${tip} (${referenceCount} referência(s)). Job ${job.id.slice(0, 8)}…`,
+      );
+      void pollAgentJob(job.id);
+    } catch (e) {
+      setMsg("");
+      setError(e instanceof Error ? e.message : "Falha ao iniciar o Flow.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function pollAgentJob(jobId: string) {
+    for (let i = 0; i < 90; i += 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const { job } = await api.agent.get(jobId);
+        setAgentJob(job);
+        if (
+          job.status === "completed" ||
+          job.status === "failed" ||
+          job.status === "cancelled"
+        ) {
+          if (job.status === "completed" && job.resultImageUrl) {
+            setMsg("Imagem pronta no agente — clique em Salvar no look.");
+          } else if (job.status === "failed") {
+            setError(job.error || "Agente falhou.");
+          }
+          return;
+        }
+        if (job.status === "waiting_user") {
+          setMsg(
+            "Modo assistido: gere/salve no Flow. Se o download cair na pasta monitorada, o still aparece aqui.",
+          );
+        }
+      } catch {
+        /* keep polling */
+      }
+    }
+  }
+
+  async function saveAgentResultToLook() {
+    if (!outfitId || !agentJob?.resultImageUrl) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.studio.outfits.update(outfitId, {
+        wornImageUrl: agentJob.resultImageUrl,
+      });
+      setOutfits((prev) =>
+        prev.map((o) =>
+          o.id === outfitId
+            ? { ...o, wornImageUrl: agentJob.resultImageUrl }
+            : o,
+        ),
+      );
+      setMsg("Still do Flow salvo em Ela vestida.");
+    } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao salvar no look.");
     } finally {
       setBusy(false);
@@ -451,9 +573,27 @@ export default function GerarStudioPage() {
               }
             >
               <Copy size={14} />
-              Copiar
+              Copiar prompt
             </Button>
             <Button
+              variant="secondary"
+              loading={busy}
+              disabled={!characterId || !outfitId}
+              onClick={() => void copyClaudePack()}
+            >
+              <Bot size={14} />
+              Copiar pacote Claude
+            </Button>
+            <Button
+              loading={busy}
+              disabled={!characterId || !outfitId || !fullPrompt.trim()}
+              onClick={() => void startFlowAgent()}
+            >
+              <MonitorPlay size={16} />
+              Gerar no Flow
+            </Button>
+            <Button
+              variant="ghost"
               loading={busy}
               disabled={!characterId || (kind === "image" && !outfitId)}
               onClick={() => void generate()}
@@ -469,11 +609,47 @@ export default function GerarStudioPage() {
           <p className="text-xs text-[var(--success-text)]">{msg}</p>
         ) : null}
 
+        {agentJob ? (
+          <Panel title="Agente Flow / Claude">
+            <p className="mb-2 text-xs text-[var(--muted)]">
+              Status: <strong>{agentJob.status}</strong>
+              {agentJob.error ? ` — ${agentJob.error}` : ""}
+            </p>
+            {agentJob.logs?.length ? (
+              <pre className="mb-3 max-h-40 overflow-auto rounded-lg border border-[var(--line)] bg-[var(--panel-elevated)] p-2 text-[10px] text-[var(--muted)]">
+                {agentJob.logs.slice(-12).join("\n")}
+              </pre>
+            ) : null}
+            {agentJob.resultImageUrl ? (
+              <div className="space-y-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={agentJob.resultImageUrl}
+                  alt="Resultado Flow"
+                  className="h-40 w-28 rounded-lg object-cover"
+                />
+                <Button
+                  loading={busy}
+                  disabled={!outfitId}
+                  onClick={() => void saveAgentResultToLook()}
+                >
+                  Salvar no look (Ela vestida)
+                </Button>
+              </div>
+            ) : (
+              <p className="text-[11px] text-[var(--muted)]">
+                No PC local com DiCloak: o Flow abre sozinho. Na Vercel use
+                só o pacote Claude (Computer Use).
+              </p>
+            )}
+          </Panel>
+        ) : null}
+
         {kind === "image" ? (
           <Panel title="5 · Depois de gerar a imagem">
             <p className="mb-3 text-[11px] text-[var(--muted)]">
-              Cole o prompt no gerador (Flow etc.), baixe o still e envie aqui —
-              grava em <strong>Ela vestida</strong> deste look.
+              Se gerou fora (Claude/Flow), envie o still aqui — grava em{" "}
+              <strong>Ela vestida</strong>.
             </p>
             {selectedOutfit?.wornImageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

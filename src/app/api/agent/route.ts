@@ -1,6 +1,9 @@
 import { jsonError, jsonOk } from "@/lib/api";
 import { listJobs } from "@/services/browser-agent/jobs";
-import { startBrowserAgentJob } from "@/services/browser-agent/runner";
+import {
+  materializeReferenceUrls,
+  startBrowserAgentJob,
+} from "@/services/browser-agent/runner";
 import { closeBrowserContext } from "@/services/browser-agent/session";
 import type { BrowserAgentJobKind } from "@/services/browser-agent/types";
 
@@ -20,6 +23,7 @@ export async function POST(request: Request) {
     negativePrompt?: string;
     productName?: string;
     referencePaths?: string[];
+    referenceUrls?: string[];
     sourceImagePath?: string;
   };
 
@@ -38,12 +42,20 @@ export async function POST(request: Request) {
   const kind = kindMap[body.action || "open_tools"];
   if (!kind) return jsonError("Ação do agente inválida.");
 
+  const fromUrls = body.referenceUrls?.length
+    ? await materializeReferenceUrls(body.referenceUrls)
+    : [];
+  const referencePaths = [
+    ...(body.referencePaths || []),
+    ...fromUrls,
+  ];
+
   const job = await startBrowserAgentJob({
     kind,
     prompt: body.prompt,
     negativePrompt: body.negativePrompt,
     productName: body.productName,
-    referencePaths: body.referencePaths || [],
+    referencePaths,
     sourceImagePath: body.sourceImagePath,
     headless: false,
   });

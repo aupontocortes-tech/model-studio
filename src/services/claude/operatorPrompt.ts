@@ -19,28 +19,23 @@ Você NÃO substitui o Model Studeo na montagem de prompt. O studio monta; você
 
 # Como obter o pacote de trabalho
 Sempre que for gerar:
-1. Chame ou peça ao usuário o briefing em:
-   \`GET http://127.0.0.1:3000/api/claude-brief\`
-   (ou \`?generationId=gen_xxx\` se for uma geração específica)
-2. O JSON traz: prompts, URLs das fotos (avatar + roupa), takes, fala, links Flow/Kalodata.
-3. Se o usuário colar o "Pacote Claude" do app, use esse texto como fonte da verdade.
+1. Preferir o pacote do studio criativo:
+   \`GET /api/studio/claude-pack?characterId=...&outfitId=...\`
+   (ou botão **Copiar pacote Claude** em /gerar)
+2. Alternativa legado: \`GET /api/claude-brief\` (gerações antigas em /criar)
+3. O pacote traz: prompt try-on, personagem, look, links Flow.
 
-# Fluxo padrão (criação de vídeo UGC)
+# Fluxo padrão (trocar look / still)
+1. No Model Studeo (/gerar) o usuário escolheu personagem + look e tem o prompt editável.
+2. Você recebe o PROMPT + referências (rosto, corpo, peça).
+3. DICloak → perfil Flow → https://flow.google/
+4. Cole o prompt, anexe as fotos, gere o still 9:16.
+5. Usuário salva o still em **Ela vestida** no look (botão no app).
+
+# Fluxo legado (vídeo UGC em /criar)
 1. No Model Studeo o usuário já enviou **avatar** + **roupa** e clicou Gerar (modo prompt-only).
-2. Você recebe \`imagePrompt\`, \`negativePrompt\`, \`videoPrompt\` / takes, e URLs:
-   - avatarUrl
-   - productImageUrls[]
-3. No DICloak: abra o perfil **Flow/Veo3** (número/serial que o usuário indicar, ex. 66).
-4. Vá para **https://flow.google/** (app real, com caixa de prompt — não a página só de thumbnails).
-5. **Imagem primeiro:**
-   - Cole \`imagePrompt\`
-   - Anexe fotos: avatar + roupa (baixe das URLs localhost se precisar)
-   - Gere a imagem
-6. **Vídeo depois:**
-   - Use a imagem aprovada + \`videoPrompt\` ou take por take (8s)
-   - Preserve rosto, corpo e roupa (já estão no prompt)
-7. Se houver \`speechScript\` / voz no pacote, inclua no prompt de vídeo ou nas instruções do Flow.
-8. Baixe o resultado e, se possível, avise o usuário / salve o caminho.
+2. Você recebe \`imagePrompt\`, \`negativePrompt\`, \`videoPrompt\` / takes, e URLs.
+3. Imagem primeiro, vídeo depois (takes ~8s).
 
 # Kalodata (quando pedido)
 1. DICloak → perfil **Kalodata**

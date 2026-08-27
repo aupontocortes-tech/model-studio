@@ -393,6 +393,58 @@ export const api = {
           }>(r),
         ),
     },
+    tryOnFlow: (body: {
+      characterId: string;
+      outfitId: string;
+      prompt?: string;
+      sceneId?: string;
+      keepSceneFromPhoto?: boolean;
+      characterMovementId?: string;
+    }) =>
+      fetch("/api/studio/try-on-flow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then((r) =>
+        parse<{
+          job: {
+            id: string;
+            kind: string;
+            status: string;
+            logs: string[];
+            resultImageUrl?: string;
+            error?: string;
+          };
+          prompt: string;
+          referenceCount: number;
+          flowUrl: string;
+          tip: string;
+        }>(r),
+      ),
+    claudePack: (opts: {
+      characterId: string;
+      outfitId: string;
+      prompt?: string;
+      sceneId?: string;
+      keepSceneFromPhoto?: boolean;
+      movementId?: string;
+    }) => {
+      const q = new URLSearchParams();
+      q.set("characterId", opts.characterId);
+      q.set("outfitId", opts.outfitId);
+      if (opts.prompt) q.set("prompt", opts.prompt);
+      if (opts.sceneId) q.set("sceneId", opts.sceneId);
+      if (opts.keepSceneFromPhoto === false) q.set("keepSceneFromPhoto", "false");
+      if (opts.movementId) q.set("movementId", opts.movementId);
+      return fetch(`/api/studio/claude-pack?${q}`).then((r) =>
+        parse<{
+          markdown: string;
+          prompt: string;
+          flowUrl: string;
+          howToUse: string;
+        }>(r),
+      );
+    },
     seed: () =>
       fetch("/api/studio/seed", { method: "POST" }).then((r) =>
         parse<{ message: string; projectId: string }>(r),
