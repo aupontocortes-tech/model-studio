@@ -1,0 +1,40 @@
+/* Service worker mínimo — permite instalar como app (Android) e cache leve. */
+
+const CACHE = "model-studeo-v1";
+const SHELL = ["/", "/gerar", "/personagens", "/configuracoes"];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE).then((cache) => cache.addAll(SHELL)).catch(() => undefined),
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
+    ),
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  const { request } = event;
+  if (request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if (url.pathname.startsWith("/api/")) return;
+
+  event.respondWith(
+    fetch(request)
+      .then((response) => {
+        if (response.ok && url.origin === self.location.origin) {
+          const copy = response.clone();
+          void caches.open(CACHE).then((cache) => cache.put(request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(request).then((r) => r || caches.match("/"))),
+  );
+});

@@ -7,7 +7,7 @@ import {
   Panel,
 } from "@/components/ui/primitives";
 import { api } from "@/lib/clientApi";
-import { Bot, Copy, ExternalLink } from "lucide-react";
+import { Bot, Copy, ExternalLink, Smartphone } from "lucide-react";
 
 export default function ConfiguracoesPage() {
   const [flowUrl, setFlowUrl] = useState("");
@@ -111,6 +111,36 @@ export default function ConfiguracoesPage() {
             Qualquer outra ferramenta: diga no chat do Claude ou escolha em
             Criação → Onde o Claude deve gerar.
           </p>
+        </Panel>
+
+        <Panel title="Instalar no celular">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/apple-icon"
+              alt=""
+              className="h-14 w-14 rounded-2xl shadow-md"
+            />
+            <p className="text-sm text-[var(--muted)]">
+              Ícone roxo <strong>M</strong> — abre como app na tela inicial.
+            </p>
+          </div>
+          <div className="mt-4 space-y-3 text-sm text-[var(--muted)]">
+            <p className="flex items-start gap-2">
+              <Smartphone size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+              <span>
+                <strong>iPhone:</strong> Safari → Compartilhar →{" "}
+                <strong>Adicionar à Tela de Início</strong>
+              </span>
+            </p>
+            <p className="flex items-start gap-2">
+              <Smartphone size={16} className="mt-0.5 shrink-0 text-[var(--accent)]" />
+              <span>
+                <strong>Android:</strong> Chrome → menu →{" "}
+                <strong>Instalar app</strong> (ou banner na parte de baixo)
+              </span>
+            </p>
+          </div>
         </Panel>
 
         <Panel title="3 · Pacote de trabalho">
