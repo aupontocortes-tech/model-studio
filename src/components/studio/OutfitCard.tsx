@@ -162,7 +162,7 @@ export function OutfitCard({
               e.stopPropagation();
               onRemove();
             }}
-            aria-label="Remover roupa"
+            aria-label="Tirar do guarda-roupa"
           >
             <Trash2 size={12} />
           </button>

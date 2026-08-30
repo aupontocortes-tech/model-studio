@@ -15,10 +15,13 @@ import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/
 import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton } from "@/components/studio/FilePickButton";
+import { AspectRatioPicker } from "@/components/studio/AspectRatioPicker";
 import {
   characterHasVoice,
   outfitLabel,
   FRAMING_OPTIONS,
+  DEFAULT_ASPECT_RATIO,
+  type AspectRatioOption,
   type FramingOption,
   type SavedStudioPrompt,
   type StudioCharacter,
@@ -56,6 +59,8 @@ export default function GerarStudioPage() {
   const [promptDirty, setPromptDirty] = useState(false);
   const [target, setTarget] = useState<"tokfy" | "flow" | "auto">("tokfy");
   const [framing, setFraming] = useState<FramingOption>("full");
+  const [aspectRatio, setAspectRatio] =
+    useState<AspectRatioOption>(DEFAULT_ASPECT_RATIO);
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -96,6 +101,7 @@ export default function GerarStudioPage() {
         kind: "video",
         keepSceneFromPhoto,
         includeVoice,
+        aspectRatio,
       }).fullPrompt;
     }
     return buildOutfitTryOnPrompt({
@@ -105,6 +111,7 @@ export default function GerarStudioPage() {
       keepSceneFromPhoto,
       scene: keepSceneFromPhoto ? null : selectedScene || null,
       framing,
+      aspectRatio,
     });
   }, [
     selected,
@@ -115,6 +122,7 @@ export default function GerarStudioPage() {
     kind,
     includeVoice,
     framing,
+    aspectRatio,
   ]);
 
   useEffect(() => {
@@ -197,6 +205,7 @@ export default function GerarStudioPage() {
         save: true,
         mode: kind === "image" ? "tryOn" : "default",
         framing: kind === "image" ? framing : undefined,
+        aspectRatio,
         editedPrompt:
           kind === "image" && promptDirty ? fullPrompt : undefined,
       });
@@ -272,6 +281,7 @@ export default function GerarStudioPage() {
         keepSceneFromPhoto,
         movementId: movementId || undefined,
         framing: kind === "image" ? framing : undefined,
+        aspectRatio,
       });
       await navigator.clipboard.writeText(pack.markdown);
       setMsg(
@@ -413,6 +423,15 @@ export default function GerarStudioPage() {
                 {label}
               </button>
             ))}
+          </div>
+          <div className="mt-4">
+            <AspectRatioPicker
+              value={aspectRatio}
+              onChange={(v) => {
+                setAspectRatio(v);
+                setPromptDirty(false);
+              }}
+            />
           </div>
         </Panel>
 

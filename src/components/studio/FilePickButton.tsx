@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, ZoomIn } from "lucide-react";
+import { Upload, ZoomIn, Trash2 } from "lucide-react";
 import { ImageLightbox } from "@/components/studio/ImageLightbox";
 
 const ACCEPT_IMAGE = "image/*,.heic,.heif,.jpg,.jpeg,.png,.webp";
@@ -52,6 +52,7 @@ export function PhotoPickSlot({
   aspectClass = "aspect-square",
   disabled,
   onFile,
+  onRemove,
   compact = false,
 }: {
   src?: string;
@@ -61,6 +62,7 @@ export function PhotoPickSlot({
   aspectClass?: string;
   disabled?: boolean;
   onFile: (file: File) => void;
+  onRemove?: () => void;
   /** Miniatura quadrada pequena (looks / galeria). */
   compact?: boolean;
 }) {
@@ -121,6 +123,19 @@ export function PhotoPickSlot({
         onFile={onFile}
         className={compact ? "min-h-8 w-full px-2 py-1.5 text-[11px]" : ""}
       />
+      {src && onRemove ? (
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onRemove}
+          className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--danger)] hover:underline ${
+            disabled ? "pointer-events-none opacity-50" : ""
+          }`}
+        >
+          <Trash2 size={12} />
+          Excluir foto
+        </button>
+      ) : null}
       {open && src ? (
         <ImageLightbox src={src} alt={alt} onClose={() => setOpen(false)} />
       ) : null}

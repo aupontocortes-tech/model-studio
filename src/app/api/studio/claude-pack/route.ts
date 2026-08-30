@@ -5,7 +5,7 @@ import {
   targetLabel,
   type OrchestratorTarget,
 } from "@/services/claude/operatorPrompt";
-import { normalizeStudioCharacter, outfitLabel, framingLabel, type FramingOption } from "@/domain/studioAssets";
+import { normalizeStudioCharacter, outfitLabel, framingLabel, aspectRatioLabel, type FramingOption, type AspectRatioOption } from "@/domain/studioAssets";
 import { buildCreativeDirectorPrompt, buildOutfitTryOnPrompt } from "@/services/prompt/CreativeDirector";
 import {
   studioCharacterRepo,
@@ -57,6 +57,15 @@ export async function GET(request: Request) {
     framingRaw === "face" || framingRaw === "half" || framingRaw === "full"
       ? framingRaw
       : undefined;
+  const aspectRaw = url.searchParams.get("aspectRatio");
+  const aspectRatio: AspectRatioOption | undefined =
+    aspectRaw === "9:16" ||
+    aspectRaw === "16:9" ||
+    aspectRaw === "1:1" ||
+    aspectRaw === "4:5" ||
+    aspectRaw === "3:4"
+      ? aspectRaw
+      : undefined;
 
   if (!characterId) return jsonError("characterId obrigatório.");
   if (!outfitId) return jsonError("outfitId obrigatório — escolha o look.");
@@ -86,6 +95,7 @@ export async function GET(request: Request) {
           kind: "video",
           keepSceneFromPhoto,
           includeVoice: true,
+          aspectRatio,
         }).fullPrompt
       : buildOutfitTryOnPrompt({
           character,
@@ -94,6 +104,7 @@ export async function GET(request: Request) {
           keepSceneFromPhoto,
           scene,
           framing,
+          aspectRatio,
         }));
 
   const env = getEnv();
@@ -124,13 +135,15 @@ export async function GET(request: Request) {
   if (sceneId && !keepSceneFromPhoto) packQuery.set("sceneId", sceneId);
   if (!keepSceneFromPhoto) packQuery.set("keepSceneFromPhoto", "false");
   if (framing) packQuery.set("framing", framing);
+  if (aspectRatio) packQuery.set("aspectRatio", aspectRatio);
 
   const markdown = [
     `# Trabalho Model Studeo`,
     "",
     `- **Tipo:** ${kind === "video" ? "Vídeo" : "Foto (still)"}`,
     `- **Onde gerar:** ${targetLabel(target)}`,
-    kind === "image" ? `- **Proporção:** ${framingLabel(framing)}` : "",
+    `- **Formato:** ${aspectRatioLabel(aspectRatio)}`,
+    kind === "image" ? `- **Enquadramento:** ${framingLabel(framing)}` : "",
     `- **App:** ${baseUrl}/gerar?character=${character.id}&outfit=${outfit.id}`,
     `- **Personagem:** ${character.identity.displayName} (\`${character.id}\`)`,
     `- **Look:** ${outfitLabel(outfit)} (\`${outfit.id}\`)`,

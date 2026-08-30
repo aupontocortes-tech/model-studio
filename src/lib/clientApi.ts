@@ -435,6 +435,7 @@ export const api = {
       keepSceneFromPhoto?: boolean;
       movementId?: string;
       framing?: "face" | "half" | "full";
+      aspectRatio?: "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
     }) => {
       const q = new URLSearchParams();
       q.set("characterId", opts.characterId);
@@ -446,6 +447,7 @@ export const api = {
       if (opts.keepSceneFromPhoto === false) q.set("keepSceneFromPhoto", "false");
       if (opts.movementId) q.set("movementId", opts.movementId);
       if (opts.framing) q.set("framing", opts.framing);
+      if (opts.aspectRatio) q.set("aspectRatio", opts.aspectRatio);
       return fetch(`/api/studio/claude-pack?${q}`).then((r) =>
         parse<{
           markdown: string;

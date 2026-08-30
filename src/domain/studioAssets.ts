@@ -15,6 +15,74 @@ export function framingLabel(framing?: FramingOption): string {
   return FRAMING_OPTIONS.find((f) => f.id === framing)?.label || "Corpo inteiro";
 }
 
+/** Proporção / tamanho da imagem ou vídeo gerado. */
+export type AspectRatioOption = "9:16" | "16:9" | "1:1" | "4:5" | "3:4";
+
+export const ASPECT_RATIO_OPTIONS: {
+  id: AspectRatioOption;
+  label: string;
+  hint: string;
+  width: number;
+  height: number;
+}[] = [
+  {
+    id: "9:16",
+    label: "9:16",
+    hint: "TikTok / Reels — principal",
+    width: 9,
+    height: 16,
+  },
+  {
+    id: "16:9",
+    label: "16:9",
+    hint: "YouTube / horizontal",
+    width: 16,
+    height: 9,
+  },
+  {
+    id: "1:1",
+    label: "1:1",
+    hint: "Quadrado Instagram",
+    width: 1,
+    height: 1,
+  },
+  {
+    id: "4:5",
+    label: "4:5",
+    hint: "Feed Instagram vertical",
+    width: 4,
+    height: 5,
+  },
+  {
+    id: "3:4",
+    label: "3:4",
+    hint: "Retrato clássico",
+    width: 3,
+    height: 4,
+  },
+];
+
+export const DEFAULT_ASPECT_RATIO: AspectRatioOption = "9:16";
+
+export function aspectRatioLabel(aspectRatio?: AspectRatioOption): string {
+  return (
+    ASPECT_RATIO_OPTIONS.find((o) => o.id === aspectRatio)?.label || "9:16"
+  );
+}
+
+export function aspectRatioPromptLine(aspectRatio?: AspectRatioOption): string {
+  const id = aspectRatio || DEFAULT_ASPECT_RATIO;
+  const opt =
+    ASPECT_RATIO_OPTIONS.find((o) => o.id === id) || ASPECT_RATIO_OPTIONS[0];
+  const orientation =
+    opt.height > opt.width
+      ? "vertical"
+      : opt.width > opt.height
+        ? "horizontal"
+        : "square";
+  return `- Output aspect ratio ${opt.label} (${orientation}, ${opt.hint}). Frame and compose for this exact format.`;
+}
+
 export interface CharacterIdentity {
   displayName: string;
   /** Bloco único / prompt de identidade (rosto + corpo). */

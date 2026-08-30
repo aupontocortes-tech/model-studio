@@ -2,6 +2,7 @@ import {
   emptyStudioCharacter,
   normalizeStudioCharacter,
   type FramingOption,
+  type AspectRatioOption,
   type SavedStudioPrompt,
   type StudioMediaKind,
 } from "@/domain/studioAssets";
@@ -48,6 +49,8 @@ export async function POST(request: Request) {
     editedPrompt?: string;
     /** Enquadramento da foto: rosto, corpo médio (coxa pra cima) ou corpo inteiro. */
     framing?: FramingOption;
+    /** Tamanho / aspect ratio (9:16 padrão). */
+    aspectRatio?: AspectRatioOption;
   };
 
   const now = nowIso();
@@ -154,6 +157,7 @@ export async function POST(request: Request) {
             keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
             scene: libraryScene || null,
             framing: body.framing,
+            aspectRatio: body.aspectRatio,
           });
         return {
           systemPrompt: "Outfit try-on",
@@ -174,6 +178,7 @@ export async function POST(request: Request) {
         kind,
         includeVoice: body.includeVoice !== false,
         keepSceneFromPhoto: Boolean(body.keepSceneFromPhoto),
+        aspectRatio: body.aspectRatio,
       });
 
   let saved: SavedStudioPrompt | undefined;

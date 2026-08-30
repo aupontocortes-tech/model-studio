@@ -681,6 +681,16 @@ export default function BibliotecaPersonagensPage() {
                             slot: "piece",
                           })
                         }
+                        onRemove={
+                          selectedLook.imageUrl
+                            ? () =>
+                                void run(async () => {
+                                  await api.studio.outfits.update(selectedLook.id, {
+                                    clearPhoto: "piece",
+                                  });
+                                }, "Foto da peça excluída.")
+                            : undefined
+                        }
                       />
                       {selectedLook.imageUrl ? (
                         <Button
@@ -717,6 +727,16 @@ export default function BibliotecaPersonagensPage() {
                             replaceId: selectedLook.id,
                             slot: "worn",
                           })
+                        }
+                        onRemove={
+                          selectedLook.wornImageUrl
+                            ? () =>
+                                void run(async () => {
+                                  await api.studio.outfits.update(selectedLook.id, {
+                                    clearPhoto: "worn",
+                                  });
+                                }, "Foto dela vestida excluída.")
+                            : undefined
                         }
                       />
                       {selectedLook.wornImageUrl ? (
@@ -774,6 +794,50 @@ export default function BibliotecaPersonagensPage() {
                   >
                     Salvar nome
                   </Button>
+                  <div className="flex flex-wrap gap-2 border-t border-[var(--line)] pt-3">
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await api.studio.characters.update(selectedId, {
+                            removeOutfitId: selectedLook.id,
+                          });
+                          if (copyOutfitId === selectedLook.id) {
+                            setCopyOutfitId("");
+                          }
+                        }, "Look removido do guarda-roupa.")
+                      }
+                    >
+                      <Trash2 size={14} />
+                      Tirar do guarda-roupa
+                    </Button>
+                    <Button
+                      variant="danger"
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            "Apagar este look da biblioteca? Personagens que usam essa roupa perdem a referência.",
+                          )
+                        ) {
+                          return;
+                        }
+                        void run(async () => {
+                          await api.studio.outfits.remove(selectedLook.id);
+                          await api.studio.characters.update(selectedId, {
+                            removeOutfitId: selectedLook.id,
+                          });
+                          if (copyOutfitId === selectedLook.id) {
+                            setCopyOutfitId("");
+                          }
+                        }, "Look excluído da biblioteca.");
+                      }}
+                    >
+                      <Trash2 size={14} />
+                      Excluir look
+                    </Button>
+                  </div>
                 </div>
               ) : null}
 

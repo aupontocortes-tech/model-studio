@@ -1,6 +1,8 @@
 import {
   CREATIVE_DIRECTOR_SYSTEM_PROMPT,
   characterHasVoice,
+  aspectRatioPromptLine,
+  type AspectRatioOption,
   type FramingOption,
   type SavedStudioPrompt,
   type StudioCharacter,
@@ -49,6 +51,8 @@ export function buildOutfitTryOnPrompt(input: {
   scene?: StudioScene | null;
   /** Enquadramento/proporção da foto: rosto, corpo médio (coxa pra cima) ou corpo inteiro. */
   framing?: FramingOption;
+  /** Tamanho / aspect ratio da saída (9:16 padrão). */
+  aspectRatio?: AspectRatioOption;
 }): string {
   const id = input.character.identity;
   const name = id.displayName?.trim() || "a personagem";
@@ -153,7 +157,8 @@ export function buildOutfitTryOnPrompt(input: {
     pose,
     "",
     "CAMERA / OUTPUT:",
-    "- Vertical 9:16, photorealistic smartphone photo look.",
+    aspectRatioPromptLine(input.aspectRatio),
+    "- Photorealistic smartphone photo look.",
     "- Sharp garment detail, natural skin texture, no beauty-filter plastic look.",
     "- No logos invented, no text on image, no watermark.",
     "",
@@ -177,6 +182,7 @@ export function buildCreativeDirectorPrompt(input: {
   includeVoice?: boolean;
   /** Mantém o fundo que já está na foto dela (look vestida / ela no cenário). */
   keepSceneFromPhoto?: boolean;
+  aspectRatio?: AspectRatioOption;
 }): { systemPrompt: string; userPrompt: string; fullPrompt: string } {
   const id = input.character.identity;
   const char = input.character;
@@ -309,9 +315,11 @@ export function buildCreativeDirectorPrompt(input: {
     vary.push(`NOTAS EXTRAS:\n${input.extraNotes.trim()}`);
   }
 
+  const aspect = input.aspectRatio || "9:16";
+
   const brief = isImage
-    ? `Gere um prompt visual detalhado para IMAGEM fotorealista (still), retrato/corpo da personagem, 9:16.`
-    : `Gere um prompt visual detalhado para VÍDEO vertical 9:16 (UGC TikTok), fotorealista.`;
+    ? `Gere um prompt visual detalhado para IMAGEM fotorealista (still), retrato/corpo da personagem, formato ${aspect}.`
+    : `Gere um prompt visual detalhado para VÍDEO ${aspect} (UGC), fotorealista.`;
 
   const userPrompt = [
     brief,
@@ -327,6 +335,7 @@ export function buildCreativeDirectorPrompt(input: {
       ? `- Descreva pose, enquadramento, luz e expressão. Sem movimento de câmera.`
       : `- Descreva ações e enquadramento com precisão.`,
     `- Sem UI de app, sem texto na tela, sem marca d'água.`,
+    aspectRatioPromptLine(aspect),
     `- Saída: um único bloco de prompt pronto para colar no Flow/Veo.`,
   ].join("\n");
 

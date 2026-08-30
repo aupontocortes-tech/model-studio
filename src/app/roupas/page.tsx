@@ -212,6 +212,16 @@ export default function RoupasPage() {
                         });
                       }, "Foto da peça atualizada.")
                     }
+                    onRemove={
+                      selected.imageUrl
+                        ? () =>
+                            void run(async () => {
+                              await api.studio.outfits.update(selectedId, {
+                                clearPhoto: "piece",
+                              });
+                            }, "Foto da peça excluída.")
+                        : undefined
+                    }
                   />
                   {selected.imageUrl ? (
                     <Button
@@ -249,6 +259,16 @@ export default function RoupasPage() {
                           slot: "worn",
                         });
                       }, "Foto dela vestida atualizada.")
+                    }
+                    onRemove={
+                      selected.wornImageUrl
+                        ? () =>
+                            void run(async () => {
+                              await api.studio.outfits.update(selectedId, {
+                                clearPhoto: "worn",
+                              });
+                            }, "Foto dela vestida excluída.")
+                        : undefined
                     }
                   />
                   {selected.wornImageUrl ? (
@@ -381,12 +401,19 @@ export default function RoupasPage() {
 
             <Button
               variant="danger"
-              onClick={() =>
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    "Excluir esta roupa da biblioteca? Fotos e referências serão apagadas.",
+                  )
+                ) {
+                  return;
+                }
                 void run(async () => {
                   await api.studio.outfits.remove(selectedId);
                   setSelectedId("");
-                }, "Roupa apagada da biblioteca.")
-              }
+                }, "Roupa apagada da biblioteca.");
+              }}
             >
               <Trash2 size={14} />
               Excluir da biblioteca

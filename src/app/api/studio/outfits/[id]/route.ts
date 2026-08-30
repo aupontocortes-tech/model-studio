@@ -26,6 +26,13 @@ export async function PATCH(request: Request, ctx: Ctx) {
       wornImageUrl = existing.imageUrl;
       imageUrl = existing.wornImageUrl;
     }
+  } else if (body.clearPhoto === "piece") {
+    imageUrl = undefined;
+  } else if (body.clearPhoto === "worn") {
+    wornImageUrl = undefined;
+  } else if (body.clearPhoto === "both") {
+    imageUrl = undefined;
+    wornImageUrl = undefined;
   } else {
     if ("imageUrl" in body) {
       imageUrl =
