@@ -47,6 +47,42 @@ type AgentJobView = {
   error?: string;
 };
 
+const LOOK_TRANSITION_PROMPT = `VÍDEO DE TRANSIÇÃO DE LOOK — APROXIMAÇÃO E BLACKOUT
+
+Crie um vídeo curto, contínuo e fotorrealista com a MESMA personagem, preservando rigorosamente rosto, cabelo, corpo, idade aparente, cenário, iluminação e anatomia.
+
+FORMATO:
+- Vídeo vertical 9:16, estética UGC de smartphone.
+- Movimento natural, câmera fixa, sem texto, sem logotipo e sem marca d'água.
+- Use a imagem de FRAME INICIAL como roupa/pose de partida.
+- Use a imagem de FRAME FINAL como roupa/pose de chegada.
+
+AÇÃO E TRANSIÇÃO:
+1. A personagem começa visível usando o PRIMEIRO LOOK e olha naturalmente para a câmera.
+2. Ela caminha devagar em direção à lente, mantendo expressão e movimentos realistas.
+3. Ao chegar muito perto, seu corpo, roupa ou mão cobre completamente a lente até o quadro ficar escuro.
+4. Faça a troca de roupa SOMENTE durante a cobertura total/blackout. Não transforme nem dissolva a roupa diante da câmera.
+5. Logo depois, a personagem se afasta da lente usando o SEGUNDO LOOK do frame final.
+6. Ela termina enquadrada, mostra o novo look e mantém o mesmo cenário e a mesma identidade.
+
+CONTINUIDADE OBRIGATÓRIA:
+- O último movimento antes do blackout e o primeiro movimento depois dele devem parecer uma única ação.
+- Mesma posição da câmera, perspectiva, velocidade, luz e fundo.
+- Trocar apenas a roupa; não alterar rosto, cabelo, corpo ou ambiente.
+- Tecidos com caimento, gravidade e movimento naturais.
+
+NEGATIVE:
+troca de rosto, morphing visível, roupa derretendo, mudança antes do blackout, salto de câmera, mudança de cenário, pessoa diferente, anatomia deformada, mãos extras, flicker, frames duplicados, texto, watermark.`;
+
+const BUILT_IN_VIDEO_PROMPTS = [
+  {
+    id: "builtin_look_transition_blackout",
+    title: "Transição de look — aproxima e escurece a câmera",
+    fullPrompt: LOOK_TRANSITION_PROMPT,
+    kind: "video" as const,
+  },
+];
+
 export default function GerarStudioPage() {
   const search = useSearchParams();
   const [characters, setCharacters] = useState<StudioCharacter[]>([]);
@@ -102,10 +138,28 @@ export default function GerarStudioPage() {
     () => collectWornPhotosForWardrobe(wardrobeIds, outfits),
     [wardrobeIds, outfits],
   );
+  const savedVideoFrames = useMemo(
+    () =>
+      wornRefs.map((ref) => {
+        const outfit = outfits.find((item) => item.id === ref.outfitId);
+        const sameLookIndex =
+          wornRefs
+            .filter((item) => item.outfitId === ref.outfitId)
+            .findIndex((item) => item.url === ref.url) + 1;
+        return {
+          url: ref.url,
+          label: `${outfitLabel(outfit)} · foto ${sameLookIndex}`,
+        };
+      }),
+    [wornRefs, outfits],
+  );
   const savedForPick = useMemo(() => {
     const forChar = saved.filter((p) => p.characterId === characterId);
     const pool = forChar.length ? forChar : saved;
-    return pool.filter((p) => !kind || !p.kind || p.kind === kind);
+    const userPrompts = pool.filter((p) => !kind || !p.kind || p.kind === kind);
+    return kind === "video"
+      ? [...BUILT_IN_VIDEO_PROMPTS, ...userPrompts]
+      : userPrompts;
   }, [saved, characterId, kind]);
 
   useEffect(() => {
@@ -292,6 +346,33 @@ export default function GerarStudioPage() {
   function applySavedPrompt(id: string) {
     setSelectedSavedPromptId(id);
     if (!id) return;
+    const builtIn = BUILT_IN_VIDEO_PROMPTS.find((x) => x.id === id);
+    if (builtIn) {
+      setKind("video");
+      setFullPrompt(builtIn.fullPrompt);
+      setPromptDirty(true);
+      setVideoClips((clips) => {
+        const first = clips[0] || {
+          id: `clip_${Date.now()}_1`,
+          title: "Transição de look",
+          duration: 8,
+          action: "",
+        };
+        return [
+          {
+            ...first,
+            title: "Transição de look",
+            duration: 8,
+            action:
+              "Ela se aproxima usando o primeiro look, cobre totalmente a câmera; durante o blackout troca para o segundo look e se afasta revelando a nova roupa.",
+          },
+          ...clips.slice(1),
+        ];
+      });
+      setMsg(`Prompt salvo carregado: ${builtIn.title}`);
+      setError("");
+      return;
+    }
     const p = saved.find((x) => x.id === id);
     if (!p) return;
     setFullPrompt(p.fullPrompt);
@@ -760,6 +841,7 @@ export default function GerarStudioPage() {
               <VideoStoryboard
                 value={videoClips}
                 onChange={setVideoClips}
+                savedFrames={savedVideoFrames}
                 disabled={busy}
               />
             ) : null}

@@ -80,10 +80,12 @@ export function storyboardPrompt(
 export function VideoStoryboard({
   value,
   onChange,
+  savedFrames = [],
   disabled,
 }: {
   value: VideoStoryboardClip[];
   onChange: (clips: VideoStoryboardClip[]) => void;
+  savedFrames?: Array<{ url: string; label: string }>;
   disabled?: boolean;
 }) {
   const [uploading, setUploading] = useState("");
@@ -239,6 +241,57 @@ export function VideoStoryboard({
               );
             })}
           </div>
+
+          {savedFrames.length > 0 ? (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {(["start", "end"] as const).map((slot) => {
+                const current =
+                  slot === "start" ? clip.startImageUrl : clip.endImageUrl;
+                return (
+                  <select
+                    key={slot}
+                    className="min-w-0 rounded-lg border border-[var(--line)] bg-[var(--panel)] px-2 py-1.5 text-[10px] text-[var(--ink)]"
+                    value={
+                      savedFrames.some((frame) => frame.url === current)
+                        ? current
+                        : ""
+                    }
+                    disabled={disabled}
+                    onChange={(e) =>
+                      patch(clip.id, {
+                        [slot === "start"
+                          ? "startImageUrl"
+                          : "endImageUrl"]: e.target.value || undefined,
+                      })
+                    }
+                    aria-label={
+                      slot === "start"
+                        ? "Escolher frame inicial salvo"
+                        : "Escolher frame final salvo"
+                    }
+                  >
+                    <option value="">
+                      {slot === "start"
+                        ? "Início: foto salva…"
+                        : "Fim: foto salva…"}
+                    </option>
+                    {savedFrames.map((frame, frameIndex) => (
+                      <option
+                        key={`${slot}-${frame.url}-${frameIndex}`}
+                        value={frame.url}
+                      >
+                        {frame.label}
+                      </option>
+                    ))}
+                  </select>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-[10px] text-[var(--muted)]">
+              Salve fotos “Ela vestida” em dois looks para selecioná-las aqui.
+            </p>
+          )}
 
           <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--line)] px-3 py-2 text-[10px] font-medium text-[var(--muted)]">
             <Upload size={13} />
