@@ -149,6 +149,8 @@ export interface StudioOutfit {
   imageUrl?: string;
   /** Foto dela já vestida com essa roupa. */
   wornImageUrl?: string;
+  /** Fotos extras dela vestida neste look (poses / variações). */
+  wornGallery?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -301,13 +303,55 @@ export function outfitPreviewUrl(
   return outfit?.wornImageUrl || outfit?.imageUrl;
 }
 
+export function outfitWornUrls(
+  outfit: Pick<StudioOutfit, "wornImageUrl" | "wornGallery"> | null | undefined,
+): string[] {
+  if (!outfit) return [];
+  const urls = [
+    outfit.wornImageUrl,
+    ...(outfit.wornGallery || []),
+  ].filter((u): u is string => Boolean(u?.trim()));
+  return [...new Set(urls)];
+}
+
+export type WornPhotoRef = {
+  outfitId: string;
+  url: string;
+  /** primary = capa do look; gallery = foto extra no mesmo look */
+  kind: "primary" | "gallery";
+  galleryIndex?: number;
+};
+
+export function collectWornPhotosForWardrobe(
+  outfitIds: string[],
+  outfits: StudioOutfit[],
+): WornPhotoRef[] {
+  const byId = new Map(outfits.map((o) => [o.id, o]));
+  const refs: WornPhotoRef[] = [];
+  for (const id of outfitIds) {
+    const o = byId.get(id);
+    if (!o) continue;
+    if (o.wornImageUrl) {
+      refs.push({ outfitId: id, url: o.wornImageUrl, kind: "primary" });
+    }
+    (o.wornGallery || []).forEach((url, i) => {
+      if (url?.trim()) {
+        refs.push({ outfitId: id, url, kind: "gallery", galleryIndex: i });
+      }
+    });
+  }
+  return refs;
+}
+
 export function normalizeStudioOutfit(raw: StudioOutfit): StudioOutfit {
+  const gallery = (raw.wornGallery || []).filter(Boolean);
   return {
     ...raw,
     name: raw.name || "",
     description: raw.description || "",
     imageUrl: raw.imageUrl,
     wornImageUrl: raw.wornImageUrl,
+    wornGallery: gallery.length ? gallery : undefined,
   };
 }
 

@@ -14,13 +14,16 @@ import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton, PhotoPickSlot } from "@/components/studio/FilePickButton";
 import { api } from "@/lib/clientApi";
 import { prepareImageFile } from "@/lib/prepareImage";
+import { WornPhotoMenu } from "@/components/studio/WornPhotoMenu";
 import {
   characterHasVoice,
+  collectWornPhotosForWardrobe,
   outfitLabel,
   sceneLabel,
   type StudioCharacter,
   type StudioOutfit,
   type StudioScene,
+  type WornPhotoRef,
 } from "@/domain/studioAssets";
 import { Plus, Trash2, Upload } from "lucide-react";
 
@@ -56,6 +59,8 @@ export default function BibliotecaPersonagensPage() {
   const [newScenePrompt, setNewScenePrompt] = useState("");
   const [dragOutfitId, setDragOutfitId] = useState<string | null>(null);
   const [dragOverOutfitId, setDragOverOutfitId] = useState<string | null>(null);
+  const [wornMenuOpen, setWornMenuOpen] = useState(false);
+  const [wornMenuAnchor, setWornMenuAnchor] = useState<DOMRect | null>(null);
 
   const selected = list.find((c) => c.id === selectedId);
   const others = list.filter((c) => c.id !== selectedId);
@@ -112,6 +117,9 @@ export default function BibliotecaPersonagensPage() {
             ...incoming,
             imageUrl: incoming.imageUrl || old?.imageUrl,
             wornImageUrl: incoming.wornImageUrl || old?.wornImageUrl,
+            wornGallery: incoming.wornGallery?.length
+              ? incoming.wornGallery
+              : old?.wornGallery,
           };
         }),
       );
@@ -366,6 +374,44 @@ export default function BibliotecaPersonagensPage() {
     }, slot === "worn" ? "Foto dela vestida ok." : "Foto da peça ok.");
   }
 
+  async function handleWornMenuUpload(
+    file: File,
+    opts: { outfitId: string; append: boolean },
+  ) {
+    if (!selectedId) return;
+    await run(async () => {
+      if (opts.outfitId === "__new__") {
+        await api.studio.outfits.upload(file, {
+          characterId: selectedId,
+          slot: "worn",
+          name: newOutfitName.trim() || undefined,
+          description: newOutfitPrompt.trim() || undefined,
+        });
+        setNewOutfitName("");
+        setNewOutfitPrompt("");
+      } else {
+        await api.studio.outfits.upload(file, {
+          outfitId: opts.outfitId,
+          characterId: selectedId,
+          slot: "worn",
+          appendWorn: opts.append,
+        });
+      }
+    }, "Foto vestida adicionada.");
+  }
+
+  async function handleWornMenuRemove(ref: WornPhotoRef) {
+    await run(async () => {
+      await api.studio.outfits.update(ref.outfitId, { removeWornUrl: ref.url });
+    }, "Foto vestida excluída.");
+  }
+
+  async function handleWornMenuSetPrimary(ref: WornPhotoRef) {
+    await run(async () => {
+      await api.studio.outfits.update(ref.outfitId, { setPrimaryWorn: ref.url });
+    }, "Foto definida como capa.");
+  }
+
   async function copyOutfit() {
     if (!copyOutfitId || !copyTargetId) return;
     await run(async () => {
@@ -604,6 +650,20 @@ export default function BibliotecaPersonagensPage() {
                   Nenhum look ainda. Envie a foto da peça e/ou dela vestida.
                 </p>
               ) : (
+                <>
+                <div className="mb-2">
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={(e) => {
+                      setWornMenuAnchor(e.currentTarget.getBoundingClientRect());
+                      setWornMenuOpen(true);
+                    }}
+                  >
+                    Ela vestida — escolher ou adicionar (
+                    {collectWornPhotosForWardrobe(selected?.outfitIds || [], outfits).length})
+                  </Button>
+                </div>
                 <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {wardrobe.map((o) => (
                     <OutfitCard
@@ -648,6 +708,7 @@ export default function BibliotecaPersonagensPage() {
                     />
                   ))}
                 </div>
+                </>
               )}
 
               {selectedLook ? (
@@ -1235,6 +1296,22 @@ export default function BibliotecaPersonagensPage() {
           </div>
         )}
       </div>
+
+      {selected ? (
+        <WornPhotoMenu
+          open={wornMenuOpen}
+          anchorRect={wornMenuAnchor}
+          onClose={() => setWornMenuOpen(false)}
+          wardrobeOutfitIds={selected.outfitIds}
+          outfits={outfits}
+          activeOutfitId={copyOutfitId}
+          disabled={busy}
+          onSelect={(ref) => setCopyOutfitId(ref.outfitId)}
+          onUpload={handleWornMenuUpload}
+          onRemove={handleWornMenuRemove}
+          onSetPrimary={handleWornMenuSetPrimary}
+        />
+      ) : null}
     </div>
   );
 }

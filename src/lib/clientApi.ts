@@ -265,7 +265,7 @@ export const api = {
         fetch(`/api/studio/outfits/${id}`, { method: "DELETE" }).then((r) =>
           parse<{ ok: boolean }>(r),
         ),
-      upload: async (file: File, opts?: { outfitId?: string; characterId?: string; name?: string; description?: string; slot?: "piece" | "worn" }) => {
+      upload: async (file: File, opts?: { outfitId?: string; characterId?: string; name?: string; description?: string; slot?: "piece" | "worn"; appendWorn?: boolean }) => {
         const form = new FormData();
         form.append("file", file);
         if (opts?.outfitId) form.append("outfitId", opts.outfitId);
@@ -273,6 +273,7 @@ export const api = {
         if (opts?.name) form.append("name", opts.name);
         if (opts?.description) form.append("description", opts.description);
         form.append("slot", opts?.slot || "piece");
+        if (opts?.appendWorn) form.append("appendWorn", "true");
         return fetch("/api/studio/outfits/upload", {
           method: "POST",
           body: form,

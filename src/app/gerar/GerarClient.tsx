@@ -16,8 +16,10 @@ import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton } from "@/components/studio/FilePickButton";
 import { AspectRatioPicker } from "@/components/studio/AspectRatioPicker";
+import { WornPhotoMenu } from "@/components/studio/WornPhotoMenu";
 import {
   characterHasVoice,
+  collectWornPhotosForWardrobe,
   outfitLabel,
   FRAMING_OPTIONS,
   DEFAULT_ASPECT_RATIO,
@@ -28,6 +30,7 @@ import {
   type StudioMediaKind,
   type StudioOutfit,
   type StudioScene,
+  type WornPhotoRef,
 } from "@/domain/studioAssets";
 import { Copy, Bot, RefreshCw } from "lucide-react";
 
@@ -61,6 +64,9 @@ export default function GerarStudioPage() {
   const [framing, setFraming] = useState<FramingOption>("full");
   const [aspectRatio, setAspectRatio] =
     useState<AspectRatioOption>(DEFAULT_ASPECT_RATIO);
+  const [sceneWornRef, setSceneWornRef] = useState<WornPhotoRef | null>(null);
+  const [wornMenuOpen, setWornMenuOpen] = useState(false);
+  const [wornMenuAnchor, setWornMenuAnchor] = useState<DOMRect | null>(null);
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -84,7 +90,21 @@ export default function GerarStudioPage() {
   const selectedOutfit = outfits.find((o) => o.id === outfitId);
   const selectedMovement = selected?.movements.find((m) => m.id === movementId);
   const selectedScene = scenes.find((s) => s.id === sceneId);
+  const wardrobeIds = selected?.outfitIds || [];
+  const wornRefs = useMemo(
+    () => collectWornPhotosForWardrobe(wardrobeIds, outfits),
+    [wardrobeIds, outfits],
+  );
+
+  useEffect(() => {
+    if (!sceneWornRef && wornRefs.length > 0) {
+      const preferred = wornRefs.find((r) => r.outfitId === outfitId) || wornRefs[0];
+      setSceneWornRef(preferred);
+    }
+  }, [outfitId, wornRefs, sceneWornRef]);
+
   const sceneFromPhotoUrl =
+    sceneWornRef?.url ||
     selectedOutfit?.wornImageUrl ||
     selectedOutfit?.imageUrl ||
     selected?.bodyImageUrl ||
@@ -125,6 +145,87 @@ export default function GerarStudioPage() {
     aspectRatio,
   ]);
 
+  async function handleWornUpload(
+    file: File,
+    opts: { outfitId: string; append: boolean },
+  ) {
+    setBusy(true);
+    setError("");
+    try {
+      if (opts.outfitId === "__new__") {
+        const { outfit } = await api.studio.outfits.upload(file, {
+          characterId,
+          slot: "worn",
+        });
+        setOutfits((prev) => [...prev, outfit]);
+        setSceneWornRef({ outfitId: outfit.id, url: outfit.wornImageUrl!, kind: "primary" });
+        setOutfitId(outfit.id);
+      } else {
+        const { outfit } = await api.studio.outfits.upload(file, {
+          outfitId: opts.outfitId,
+          characterId,
+          slot: "worn",
+          appendWorn: opts.append,
+        });
+        setOutfits((prev) =>
+          prev.map((o) => (o.id === outfit.id ? outfit : o)),
+        );
+        const url = opts.append
+          ? outfit.wornGallery?.[outfit.wornGallery.length - 1] || outfit.wornImageUrl
+          : outfit.wornImageUrl;
+        if (url) {
+          setSceneWornRef({
+            outfitId: outfit.id,
+            url,
+            kind: opts.append ? "gallery" : "primary",
+          });
+        }
+      }
+      setKeepSceneFromPhoto(true);
+      setSceneId("");
+      setPromptDirty(false);
+      setMsg("Foto vestida adicionada.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha no upload.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWornRemove(ref: WornPhotoRef) {
+    setBusy(true);
+    try {
+      await api.studio.outfits.update(ref.outfitId, { removeWornUrl: ref.url });
+      const { outfits: listed } = await api.studio.outfits.list();
+      setOutfits(listed);
+      if (sceneWornRef?.url === ref.url) {
+        const next = collectWornPhotosForWardrobe(wardrobeIds, listed)[0] || null;
+        setSceneWornRef(next);
+      }
+      setMsg("Foto vestida excluída.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao excluir.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleWornSetPrimary(ref: WornPhotoRef) {
+    setBusy(true);
+    try {
+      const { outfit } = await api.studio.outfits.update(ref.outfitId, {
+        setPrimaryWorn: ref.url,
+      });
+      setOutfits((prev) => prev.map((o) => (o.id === outfit.id ? outfit : o)));
+      setSceneWornRef({ ...ref, kind: "primary" });
+      setMsg("Foto definida como capa do look.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao atualizar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     void (async () => {
       const [c, o, s, p] = await Promise.allSettled([
@@ -156,6 +257,7 @@ export default function GerarStudioPage() {
     setKeepSceneFromPhoto(true);
     setIncludeVoice(true);
     setFraming("full");
+    setSceneWornRef(null);
     setPromptDirty(false);
     setFullPrompt("");
   }, [characterId]);
@@ -564,10 +666,12 @@ export default function GerarStudioPage() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
                   setKeepSceneFromPhoto(true);
                   setSceneId("");
                   setPromptDirty(false);
+                  setWornMenuAnchor(e.currentTarget.getBoundingClientRect());
+                  setWornMenuOpen(true);
                 }}
                 className={`overflow-hidden rounded-xl border text-left ${
                   keepSceneFromPhoto
@@ -584,11 +688,12 @@ export default function GerarStudioPage() {
                   />
                 ) : (
                   <div className="flex aspect-square items-center justify-center bg-[var(--panel-elevated)] px-3 text-center text-xs text-[var(--muted)]">
-                    Sem foto ainda
+                    Toque para escolher
                   </div>
                 )}
                 <p className="px-2 py-1.5 text-[11px] font-medium text-[var(--ink)]">
-                  Cenário da imagem dela
+                  Ela vestida
+                  {wornRefs.length > 1 ? ` (${wornRefs.length})` : ""}
                 </p>
               </button>
               {[...herScenes, ...otherScenes].map((s) => (
@@ -794,6 +899,26 @@ export default function GerarStudioPage() {
           </Panel>
         ) : null}
       </div>
+
+      <WornPhotoMenu
+        open={wornMenuOpen}
+        anchorRect={wornMenuAnchor}
+        onClose={() => setWornMenuOpen(false)}
+        wardrobeOutfitIds={wardrobeIds}
+        outfits={outfits}
+        activeOutfitId={outfitId}
+        selectedRef={sceneWornRef}
+        disabled={busy}
+        onSelect={(ref) => {
+          setSceneWornRef(ref);
+          setKeepSceneFromPhoto(true);
+          setSceneId("");
+          setPromptDirty(false);
+        }}
+        onUpload={handleWornUpload}
+        onRemove={handleWornRemove}
+        onSetPrimary={handleWornSetPrimary}
+      />
     </div>
   );
 }

@@ -35,6 +35,7 @@ export async function POST(request: Request) {
   const description = String(form.get("description") || "").trim();
   const slotRaw = String(form.get("slot") || "piece");
   const slot: OutfitPhotoSlot = slotRaw === "worn" ? "worn" : "piece";
+  const appendWorn = String(form.get("appendWorn") || "") === "true";
 
   const ext = file.name.includes(".")
     ? `.${file.name.split(".").pop()!.toLowerCase()}`
@@ -55,7 +56,14 @@ export async function POST(request: Request) {
 
   const photoPatch =
     slot === "worn"
-      ? { wornImageUrl: saved.publicUrl }
+      ? existing && appendWorn && existing.wornImageUrl
+        ? {
+            wornGallery: [
+              ...(existing.wornGallery || []),
+              saved.publicUrl,
+            ],
+          }
+        : { wornImageUrl: saved.publicUrl }
       : { imageUrl: saved.publicUrl };
 
   const outfit: StudioOutfit = existing
@@ -72,6 +80,7 @@ export async function POST(request: Request) {
         description,
         imageUrl: slot === "piece" ? saved.publicUrl : undefined,
         wornImageUrl: slot === "worn" ? saved.publicUrl : undefined,
+        wornGallery: undefined,
         createdAt: now,
         updatedAt: now,
       };
