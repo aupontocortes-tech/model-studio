@@ -16,6 +16,11 @@ import { OutfitCard } from "@/components/studio/OutfitCard";
 import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton } from "@/components/studio/FilePickButton";
 import { AspectRatioPicker } from "@/components/studio/AspectRatioPicker";
+import {
+  VideoStoryboard,
+  storyboardPrompt,
+  type VideoStoryboardClip,
+} from "@/components/studio/VideoStoryboard";
 import { WornPhotoMenu } from "@/components/studio/WornPhotoMenu";
 import {
   characterHasVoice,
@@ -67,6 +72,8 @@ export default function GerarStudioPage() {
   const [sceneWornRef, setSceneWornRef] = useState<WornPhotoRef | null>(null);
   const [wornMenuOpen, setWornMenuOpen] = useState(false);
   const [wornMenuAnchor, setWornMenuAnchor] = useState<DOMRect | null>(null);
+  const [selectedSavedPromptId, setSelectedSavedPromptId] = useState("");
+  const [videoClips, setVideoClips] = useState<VideoStoryboardClip[]>([]);
   const [agentJob, setAgentJob] = useState<AgentJobView | null>(null);
 
   const selected = characters.find((c) => c.id === characterId);
@@ -95,6 +102,11 @@ export default function GerarStudioPage() {
     () => collectWornPhotosForWardrobe(wardrobeIds, outfits),
     [wardrobeIds, outfits],
   );
+  const savedForPick = useMemo(() => {
+    const forChar = saved.filter((p) => p.characterId === characterId);
+    const pool = forChar.length ? forChar : saved;
+    return pool.filter((p) => !kind || !p.kind || p.kind === kind);
+  }, [saved, characterId, kind]);
 
   useEffect(() => {
     if (!sceneWornRef && wornRefs.length > 0) {
@@ -258,6 +270,7 @@ export default function GerarStudioPage() {
     setIncludeVoice(true);
     setFraming("full");
     setSceneWornRef(null);
+    setSelectedSavedPromptId("");
     setPromptDirty(false);
     setFullPrompt("");
   }, [characterId]);
@@ -272,11 +285,28 @@ export default function GerarStudioPage() {
     setFullPrompt(tryOnTemplate);
   }, [tryOnTemplate, kind, promptDirty]);
 
+  useEffect(() => {
+    setSelectedSavedPromptId("");
+  }, [outfitId, kind]);
+
+  function applySavedPrompt(id: string) {
+    setSelectedSavedPromptId(id);
+    if (!id) return;
+    const p = saved.find((x) => x.id === id);
+    if (!p) return;
+    setFullPrompt(p.fullPrompt);
+    setPromptDirty(true);
+    if (p.kind) setKind(p.kind);
+    setMsg(`Prompt salvo carregado: ${p.title}`);
+    setError("");
+  }
+
   function restoreProfessionalPrompt() {
     if (!tryOnTemplate) {
       setError("Escolha personagem e um look da área de roupas.");
       return;
     }
+    setSelectedSavedPromptId("");
     setPromptDirty(false);
     setFullPrompt(tryOnTemplate);
     setMsg("Prompt profissional de trocar look restaurado — você pode editar.");
@@ -376,7 +406,10 @@ export default function GerarStudioPage() {
       const pack = await api.studio.claudePack({
         characterId,
         outfitId,
-        prompt: fullPrompt || undefined,
+        prompt:
+          kind === "video"
+            ? `${fullPrompt}${storyboardPrompt(videoClips, window.location.origin)}`
+            : fullPrompt || undefined,
         kind,
         target,
         sceneId: keepSceneFromPhoto ? undefined : sceneId || undefined,
@@ -384,6 +417,7 @@ export default function GerarStudioPage() {
         movementId: movementId || undefined,
         framing: kind === "image" ? framing : undefined,
         aspectRatio,
+        selectedWornUrl: sceneWornRef?.url,
       });
       await navigator.clipboard.writeText(pack.markdown);
       setMsg(
@@ -721,6 +755,14 @@ export default function GerarStudioPage() {
                 {selected.voice?.name || selected.identity.displayName}
               </label>
             ) : null}
+
+            {kind === "video" ? (
+              <VideoStoryboard
+                value={videoClips}
+                onChange={setVideoClips}
+                disabled={busy}
+              />
+            ) : null}
           </div>
         </Panel>
 
@@ -732,13 +774,32 @@ export default function GerarStudioPage() {
               : "Selecione um look para montar o prompt."
           }
         >
+          {savedForPick.length > 0 ? (
+            <Field label="Prompt salvo">
+              <select
+                className={inputClass}
+                value={selectedSavedPromptId}
+                onChange={(e) => applySavedPrompt(e.target.value)}
+              >
+                <option value="">
+                  Escrever manualmente / prompt automático
+                </option>
+                {savedForPick.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
           <textarea
-            className={`${inputClass} min-h-[240px] font-mono text-[11px] leading-4`}
+            className={`${inputClass} mt-3 min-h-[240px] font-mono text-[11px] leading-4`}
             value={fullPrompt}
-            placeholder="Escolha personagem + look — o prompt aparece aqui e você pode mudar…"
+            placeholder="Escolha personagem + look — o prompt aparece aqui. Ou selecione um prompt salvo acima."
             onChange={(e) => {
               setFullPrompt(e.target.value);
               setPromptDirty(true);
+              setSelectedSavedPromptId("");
             }}
           />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -877,27 +938,6 @@ export default function GerarStudioPage() {
           </Panel>
         ) : null}
 
-        {saved.length > 0 ? (
-          <Panel title="Últimos prompts">
-            <ul className="space-y-1 text-sm">
-              {saved.slice(0, 5).map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    className="w-full rounded-lg px-2 py-2 text-left hover:bg-[var(--panel-elevated)]"
-                    onClick={() => {
-                      setFullPrompt(p.fullPrompt);
-                      setPromptDirty(true);
-                      if (p.kind) setKind(p.kind);
-                    }}
-                  >
-                    {p.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Panel>
-        ) : null}
       </div>
 
       <WornPhotoMenu

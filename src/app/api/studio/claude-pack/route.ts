@@ -50,6 +50,7 @@ export async function GET(request: Request) {
   const keepSceneFromPhoto = url.searchParams.get("keepSceneFromPhoto") !== "false";
   const movementId = url.searchParams.get("movementId")?.trim();
   const editedPrompt = url.searchParams.get("prompt")?.trim();
+  const selectedWornUrl = url.searchParams.get("selectedWornUrl")?.trim();
   const kind = url.searchParams.get("kind") === "video" ? "video" : "image";
   const target = parseTarget(url.searchParams.get("target"), kind);
   const framingRaw = url.searchParams.get("framing");
@@ -115,6 +116,9 @@ export async function GET(request: Request) {
     refLine("Corpo", character.bodyImageUrl, baseUrl),
     refLine("Peça", outfit.imageUrl, baseUrl),
     refLine("Ela vestida", outfit.wornImageUrl, baseUrl),
+    selectedWornUrl && selectedWornUrl !== outfit.wornImageUrl
+      ? refLine("Foto vestida escolhida", selectedWornUrl, baseUrl)
+      : "",
   ].filter(Boolean);
 
   const mission = buildOrchestratorMission({
