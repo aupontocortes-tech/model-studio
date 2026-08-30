@@ -223,8 +223,8 @@ export function VideoStoryboard({
                     {uploading === `${clip.id}-${slot}`
                       ? "Enviando…"
                       : url
-                        ? "Trocar"
-                        : "Adicionar"}
+                        ? "Trocar pelo computador/celular"
+                        : "Computador/celular"}
                   </span>
                   <input
                     type="file"
@@ -272,8 +272,8 @@ export function VideoStoryboard({
                   >
                     <option value="">
                       {slot === "start"
-                        ? "Início: foto salva…"
-                        : "Fim: foto salva…"}
+                        ? "Início: galeria da personagem…"
+                        : "Fim: galeria da personagem…"}
                     </option>
                     {savedFrames.map((frame, frameIndex) => (
                       <option
@@ -289,7 +289,8 @@ export function VideoStoryboard({
             </div>
           ) : (
             <p className="mt-2 text-[10px] text-[var(--muted)]">
-              Salve fotos “Ela vestida” em dois looks para selecioná-las aqui.
+              A galeria da personagem ainda não tem fotos “Ela vestida”.
+              Você pode enviar do computador/celular acima.
             </p>
           )}
 
