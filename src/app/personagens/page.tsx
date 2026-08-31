@@ -697,14 +697,49 @@ export default function BibliotecaPersonagensPage() {
                         setDragOutfitId(null);
                         setDragOverOutfitId(null);
                       }}
-                      onRemove={() =>
+                      onMovePhoto={(from) =>
+                        void run(async () => {
+                          await api.studio.outfits.update(o.id, {
+                            movePhoto:
+                              from === "piece"
+                                ? "pieceToWorn"
+                                : "wornToPiece",
+                          });
+                        }, "Foto colocada no lugar certo.")
+                      }
+                      onDeletePhoto={(slot) => {
+                        const label =
+                          slot === "piece"
+                            ? "a foto da peça"
+                            : "a foto dela vestida";
+                        if (
+                          !window.confirm(
+                            `Tem certeza que deseja excluir ${label}?`,
+                          )
+                        ) {
+                          return;
+                        }
+                        void run(async () => {
+                          await api.studio.outfits.update(o.id, {
+                            clearPhoto: slot,
+                          });
+                        }, "Foto excluída.")
+                      }}
+                      onRemove={() => {
+                        if (
+                          !window.confirm(
+                            "Tem certeza que deseja tirar este look do guarda-roupa? Ele continuará na biblioteca.",
+                          )
+                        ) {
+                          return;
+                        }
                         void run(async () => {
                           await api.studio.characters.update(selectedId, {
                             removeOutfitId: o.id,
                           });
                           if (copyOutfitId === o.id) setCopyOutfitId("");
-                        }, "Tirou do guarda-roupa (continua na biblioteca).")
-                      }
+                        }, "Tirou do guarda-roupa (continua na biblioteca).");
+                      }}
                     />
                   ))}
                 </div>

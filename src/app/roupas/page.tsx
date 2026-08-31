@@ -172,6 +172,32 @@ export default function RoupasPage() {
                   outfit={o}
                   selected={o.id === selectedId}
                   onSelect={() => setSelectedId(o.id)}
+                  onMovePhoto={(from) =>
+                    void run(async () => {
+                      await api.studio.outfits.update(o.id, {
+                        movePhoto:
+                          from === "piece" ? "pieceToWorn" : "wornToPiece",
+                      });
+                    }, "Foto colocada no lugar certo.")
+                  }
+                  onDeletePhoto={(slot) => {
+                    const label =
+                      slot === "piece"
+                        ? "a foto da peça"
+                        : "a foto dela vestida";
+                    if (
+                      !window.confirm(
+                        `Tem certeza que deseja excluir ${label}?`,
+                      )
+                    ) {
+                      return;
+                    }
+                    void run(async () => {
+                      await api.studio.outfits.update(o.id, {
+                        clearPhoto: slot,
+                      });
+                    }, "Foto excluída.");
+                  }}
                 />
               ))}
             </div>

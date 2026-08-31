@@ -127,7 +127,15 @@ export function PhotoPickSlot({
         <button
           type="button"
           disabled={disabled}
-          onClick={onRemove}
+          onClick={() => {
+            if (
+              window.confirm(
+                `Tem certeza que deseja excluir a foto “${alt}”?`,
+              )
+            ) {
+              onRemove();
+            }
+          }}
           className={`mt-1.5 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--danger)] hover:underline ${
             disabled ? "pointer-events-none opacity-50" : ""
           }`}

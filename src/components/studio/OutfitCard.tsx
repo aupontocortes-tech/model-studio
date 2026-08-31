@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GripVertical, Trash2, ZoomIn } from "lucide-react";
+import { Grip, GripVertical, Trash2, ZoomIn } from "lucide-react";
 import { outfitLabel, type StudioOutfit } from "@/domain/studioAssets";
 import { ImageLightbox } from "@/components/studio/ImageLightbox";
 
@@ -9,15 +9,43 @@ function Thumb({
   src,
   label,
   empty,
+  slot,
   onZoom,
+  onMovePhoto,
+  onDeletePhoto,
 }: {
   src?: string;
   label: string;
   empty: string;
+  slot: "piece" | "worn";
   onZoom?: (src: string) => void;
+  onMovePhoto?: (from: "piece" | "worn", to: "piece" | "worn") => void;
+  onDeletePhoto?: (slot: "piece" | "worn") => void;
 }) {
   return (
-    <div className="relative min-w-0">
+    <div
+      className="relative min-w-0"
+      onDragOver={(e) => {
+        if (!onMovePhoto) return;
+        const from = e.dataTransfer.types.includes(
+          "application/x-model-studeo-photo",
+        );
+        if (!from) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(e) => {
+        if (!onMovePhoto) return;
+        const from = e.dataTransfer.getData(
+          "application/x-model-studeo-photo",
+        ) as "piece" | "worn";
+        if (!from || from === slot) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onMovePhoto(from, slot);
+      }}
+    >
       <p className="mb-0.5 truncate text-[9px] font-medium uppercase tracking-wide text-[var(--muted)]">
         {label}
       </p>
@@ -30,6 +58,41 @@ function Thumb({
             className="aspect-square w-full object-cover"
             draggable={false}
           />
+          {onMovePhoto ? (
+            <button
+              type="button"
+              draggable
+              className="absolute bottom-0.5 left-0.5 cursor-grab rounded bg-black/65 p-0.5 text-white hover:bg-black/85 active:cursor-grabbing"
+              title={`Segure e arraste ${label} para o outro lado`}
+              aria-label={`Arrastar ${label}`}
+              onClick={(e) => e.stopPropagation()}
+              onDragStart={(e) => {
+                e.stopPropagation();
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData(
+                  "application/x-model-studeo-photo",
+                  slot,
+                );
+              }}
+            >
+              <Grip size={11} />
+            </button>
+          ) : null}
+          {onDeletePhoto ? (
+            <button
+              type="button"
+              className="absolute right-0.5 top-0.5 rounded bg-red-700/80 p-0.5 text-white hover:bg-red-700"
+              title={`Excluir somente ${label}`}
+              aria-label={`Excluir somente ${label}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onDeletePhoto(slot);
+              }}
+            >
+              <Trash2 size={11} />
+            </button>
+          ) : null}
           {onZoom ? (
             <button
               type="button"
@@ -60,6 +123,8 @@ export function OutfitCard({
   selected = false,
   onSelect,
   onRemove,
+  onMovePhoto,
+  onDeletePhoto,
   draggable = false,
   dragging = false,
   dragOver = false,
@@ -73,6 +138,8 @@ export function OutfitCard({
   selected?: boolean;
   onSelect?: () => void;
   onRemove?: () => void;
+  onMovePhoto?: (from: "piece" | "worn", to: "piece" | "worn") => void;
+  onDeletePhoto?: (slot: "piece" | "worn") => void;
   draggable?: boolean;
   dragging?: boolean;
   dragOver?: boolean;
@@ -136,13 +203,19 @@ export function OutfitCard({
             src={outfit.imageUrl}
             label="Peça"
             empty="Peça"
+            slot="piece"
             onZoom={(src) => setLightbox({ src, alt: "Peça" })}
+            onMovePhoto={onMovePhoto}
+            onDeletePhoto={outfit.imageUrl ? onDeletePhoto : undefined}
           />
           <Thumb
             src={outfit.wornImageUrl}
             label="Vestida"
             empty="Vestida"
+            slot="worn"
             onZoom={(src) => setLightbox({ src, alt: "Ela vestida" })}
+            onMovePhoto={onMovePhoto}
+            onDeletePhoto={outfit.wornImageUrl ? onDeletePhoto : undefined}
           />
         </div>
         {hasName ? (
@@ -157,14 +230,15 @@ export function OutfitCard({
         {onRemove ? (
           <button
             type="button"
-            className="absolute right-1 top-1 rounded-md bg-black/55 p-1 text-white hover:bg-black/75"
+            className="mt-1 flex w-full items-center justify-center gap-1 rounded-md border border-[var(--line)] py-1 text-[9px] font-medium text-[var(--muted)] hover:border-[var(--danger)] hover:text-[var(--danger)]"
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
             }}
-            aria-label="Tirar do guarda-roupa"
+            aria-label="Tirar look do guarda-roupa"
           >
             <Trash2 size={12} />
+            Tirar look
           </button>
         ) : null}
       </div>
