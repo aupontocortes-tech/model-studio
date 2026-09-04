@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Grip, GripVertical, Trash2, ZoomIn } from "lucide-react";
-import { outfitLabel, type StudioOutfit } from "@/domain/studioAssets";
+import { Grip, GripVertical, Images, Trash2, ZoomIn } from "lucide-react";
+import {
+  outfitLabel,
+  outfitWornUrls,
+  type StudioOutfit,
+} from "@/domain/studioAssets";
 import { ImageLightbox } from "@/components/studio/ImageLightbox";
 
 function Thumb({
@@ -122,6 +126,7 @@ export function OutfitCard({
   outfit,
   selected = false,
   onSelect,
+  onOpenWornGallery,
   onRemove,
   onMovePhoto,
   onDeletePhoto,
@@ -137,6 +142,7 @@ export function OutfitCard({
   outfit: StudioOutfit;
   selected?: boolean;
   onSelect?: () => void;
+  onOpenWornGallery?: () => void;
   onRemove?: () => void;
   onMovePhoto?: (from: "piece" | "worn", to: "piece" | "worn") => void;
   onDeletePhoto?: (slot: "piece" | "worn") => void;
@@ -154,24 +160,31 @@ export function OutfitCard({
   );
   const label = outfitLabel(outfit);
   const hasName = Boolean(outfit.name?.trim());
+  const wornCount = outfitWornUrls(outfit).length;
+  const interactive = Boolean(onSelect || onOpenWornGallery);
+
+  function activate() {
+    onSelect?.();
+    onOpenWornGallery?.();
+  }
 
   return (
     <>
       <div
-        role={onSelect ? "button" : undefined}
-        tabIndex={onSelect ? 0 : undefined}
+        role={interactive ? "button" : undefined}
+        tabIndex={interactive ? 0 : undefined}
         draggable={draggable}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         onDragEnd={onDragEnd}
-        onClick={() => onSelect?.()}
+        onClick={activate}
         onKeyDown={(e) => {
-          if (!onSelect) return;
+          if (!interactive) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            onSelect();
+            activate();
           }
         }}
         className={`relative overflow-hidden rounded-xl border p-1.5 text-left transition ${
@@ -180,7 +193,7 @@ export function OutfitCard({
             : "border-[var(--line)] hover:border-[var(--accent)]"
         } ${dragging ? "opacity-40" : ""} ${
           dragOver ? "border-[var(--accent)] ring-2 ring-[var(--accent)]" : ""
-        } ${onSelect ? "cursor-pointer" : ""} ${
+        } ${interactive ? "cursor-pointer" : ""} ${
           draggable ? "cursor-grab active:cursor-grabbing" : ""
         }`}
       >
@@ -196,6 +209,12 @@ export function OutfitCard({
         {selected ? (
           <span className="absolute left-1/2 top-1 z-[1] -translate-x-1/2 rounded-full bg-[var(--accent)] px-2 py-0.5 text-[9px] font-semibold text-white">
             Selecionado
+          </span>
+        ) : null}
+        {onOpenWornGallery && wornCount > 0 ? (
+          <span className="absolute right-1 top-1 z-[1] inline-flex items-center gap-1 rounded-full bg-black/65 px-1.5 py-0.5 text-[9px] font-semibold text-white">
+            <Images size={10} />
+            {wornCount}
           </span>
         ) : null}
         <div className="grid grid-cols-2 gap-1.5">
@@ -227,6 +246,13 @@ export function OutfitCard({
             Toque para escolher
           </p>
         )}
+        {onOpenWornGallery ? (
+          <p className="mt-0.5 px-0.5 text-[9px] font-medium text-[var(--accent)]">
+            {wornCount > 0
+              ? `${wornCount} ${wornCount === 1 ? "foto vestida" : "fotos vestidas"} · abrir`
+              : "Adicionar fotos dela vestida"}
+          </p>
+        ) : null}
         {onRemove ? (
           <button
             type="button"

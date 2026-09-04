@@ -14,10 +14,9 @@ import { SceneCard } from "@/components/studio/SceneCard";
 import { FilePickButton, PhotoPickSlot } from "@/components/studio/FilePickButton";
 import { api } from "@/lib/clientApi";
 import { prepareImageFile } from "@/lib/prepareImage";
-import { WornPhotoMenu } from "@/components/studio/WornPhotoMenu";
+import { OutfitWornGalleryDialog } from "@/components/studio/OutfitWornGalleryDialog";
 import {
   characterHasVoice,
-  collectWornPhotosForWardrobe,
   outfitLabel,
   sceneLabel,
   type StudioCharacter,
@@ -59,8 +58,7 @@ export default function BibliotecaPersonagensPage() {
   const [newScenePrompt, setNewScenePrompt] = useState("");
   const [dragOutfitId, setDragOutfitId] = useState<string | null>(null);
   const [dragOverOutfitId, setDragOverOutfitId] = useState<string | null>(null);
-  const [wornMenuOpen, setWornMenuOpen] = useState(false);
-  const [wornMenuAnchor, setWornMenuAnchor] = useState<DOMRect | null>(null);
+  const [galleryOutfitId, setGalleryOutfitId] = useState<string | null>(null);
 
   const selected = list.find((c) => c.id === selectedId);
   const others = list.filter((c) => c.id !== selectedId);
@@ -77,6 +75,7 @@ export default function BibliotecaPersonagensPage() {
     [outfits, selected],
   );
   const selectedLook = wardrobe.find((o) => o.id === copyOutfitId);
+  const galleryOutfit = outfits.find((o) => o.id === galleryOutfitId);
   const pinnedScenes = useMemo(
     () => scenes.filter((s) => selected?.sceneIds.includes(s.id)),
     [scenes, selected],
@@ -374,39 +373,31 @@ export default function BibliotecaPersonagensPage() {
     }, slot === "worn" ? "Foto dela vestida ok." : "Foto da peça ok.");
   }
 
-  async function handleWornMenuUpload(
-    file: File,
-    opts: { outfitId: string; append: boolean },
-  ) {
-    if (!selectedId) return;
+  async function uploadWornGallery(outfitId: string, files: File[]) {
+    if (!selectedId || files.length === 0) return;
     await run(async () => {
-      if (opts.outfitId === "__new__") {
+      const current = outfits.find((outfit) => outfit.id === outfitId);
+      let hasPrimary = Boolean(current?.wornImageUrl);
+      for (const source of files) {
+        const file = await prepareImageFile(source);
         await api.studio.outfits.upload(file, {
+          outfitId,
           characterId: selectedId,
           slot: "worn",
-          name: newOutfitName.trim() || undefined,
-          description: newOutfitPrompt.trim() || undefined,
+          appendWorn: hasPrimary,
         });
-        setNewOutfitName("");
-        setNewOutfitPrompt("");
-      } else {
-        await api.studio.outfits.upload(file, {
-          outfitId: opts.outfitId,
-          characterId: selectedId,
-          slot: "worn",
-          appendWorn: opts.append,
-        });
+        hasPrimary = true;
       }
-    }, "Foto vestida adicionada.");
+    }, `${files.length} ${files.length === 1 ? "foto adicionada" : "fotos adicionadas"} ao look.`);
   }
 
-  async function handleWornMenuRemove(ref: WornPhotoRef) {
+  async function removeWornPhoto(ref: WornPhotoRef) {
     await run(async () => {
       await api.studio.outfits.update(ref.outfitId, { removeWornUrl: ref.url });
     }, "Foto vestida excluída.");
   }
 
-  async function handleWornMenuSetPrimary(ref: WornPhotoRef) {
+  async function setPrimaryWornPhoto(ref: WornPhotoRef) {
     await run(async () => {
       await api.studio.outfits.update(ref.outfitId, { setPrimaryWorn: ref.url });
     }, "Foto definida como capa.");
@@ -643,27 +634,13 @@ export default function BibliotecaPersonagensPage() {
 
             <Panel
               title="Looks dela"
-              description="Arraste e solte para reorganizar. Clique na foto para ampliar. Still da Criação vai para Ela vestida."
+              description="Clique em um look para ver e adicionar várias fotos dela com a mesma roupa. Arraste para reorganizar."
             >
               {wardrobe.length === 0 ? (
                 <p className="mb-3 text-sm text-[var(--muted)]">
                   Nenhum look ainda. Envie a foto da peça e/ou dela vestida.
                 </p>
               ) : (
-                <>
-                <div className="mb-2">
-                  <Button
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={(e) => {
-                      setWornMenuAnchor(e.currentTarget.getBoundingClientRect());
-                      setWornMenuOpen(true);
-                    }}
-                  >
-                    Ela vestida — escolher ou adicionar (
-                    {collectWornPhotosForWardrobe(selected?.outfitIds || [], outfits).length})
-                  </Button>
-                </div>
                 <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
                   {wardrobe.map((o) => (
                     <OutfitCard
@@ -671,6 +648,7 @@ export default function BibliotecaPersonagensPage() {
                       outfit={o}
                       selected={copyOutfitId === o.id}
                       onSelect={() => setCopyOutfitId(o.id)}
+                      onOpenWornGallery={() => setGalleryOutfitId(o.id)}
                       draggable
                       dragging={dragOutfitId === o.id}
                       dragOver={dragOverOutfitId === o.id}
@@ -743,7 +721,6 @@ export default function BibliotecaPersonagensPage() {
                     />
                   ))}
                 </div>
-                </>
               )}
 
               {selectedLook ? (
@@ -1332,19 +1309,14 @@ export default function BibliotecaPersonagensPage() {
         )}
       </div>
 
-      {selected ? (
-        <WornPhotoMenu
-          open={wornMenuOpen}
-          anchorRect={wornMenuAnchor}
-          onClose={() => setWornMenuOpen(false)}
-          wardrobeOutfitIds={selected.outfitIds}
-          outfits={outfits}
-          activeOutfitId={copyOutfitId}
+      {galleryOutfit ? (
+        <OutfitWornGalleryDialog
+          outfit={galleryOutfit}
           disabled={busy}
-          onSelect={(ref) => setCopyOutfitId(ref.outfitId)}
-          onUpload={handleWornMenuUpload}
-          onRemove={handleWornMenuRemove}
-          onSetPrimary={handleWornMenuSetPrimary}
+          onClose={() => setGalleryOutfitId(null)}
+          onUpload={(files) => uploadWornGallery(galleryOutfit.id, files)}
+          onRemove={removeWornPhoto}
+          onSetPrimary={setPrimaryWornPhoto}
         />
       ) : null}
     </div>

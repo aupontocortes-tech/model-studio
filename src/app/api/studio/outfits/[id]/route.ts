@@ -18,7 +18,6 @@ export async function PATCH(request: Request, ctx: Ctx) {
   if (body.swapPhotoSlots === true) {
     imageUrl = existing.wornImageUrl;
     wornImageUrl = existing.imageUrl;
-    wornGallery = [];
   } else if (body.movePhoto === "pieceToWorn") {
     if (existing.imageUrl) {
       imageUrl = existing.wornImageUrl;
@@ -26,8 +25,15 @@ export async function PATCH(request: Request, ctx: Ctx) {
     }
   } else if (body.movePhoto === "wornToPiece") {
     if (existing.wornImageUrl) {
-      wornImageUrl = existing.imageUrl;
       imageUrl = existing.wornImageUrl;
+      if (existing.imageUrl) {
+        wornImageUrl = existing.imageUrl;
+      } else if (wornGallery.length > 0) {
+        wornImageUrl = wornGallery[0];
+        wornGallery = wornGallery.slice(1);
+      } else {
+        wornImageUrl = undefined;
+      }
     }
   } else if (body.clearPhoto === "piece") {
     imageUrl = undefined;
