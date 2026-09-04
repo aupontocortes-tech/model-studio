@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Check,
   Clapperboard,
@@ -73,6 +74,9 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 export default function CriarPage() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const embedded = pathname !== "/criar";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
@@ -138,6 +142,12 @@ export default function CriarPage() {
   useEffect(() => {
     if (autoTakes) setVideoTakes(suggestTakes(videoAction));
   }, [videoAction, autoTakes]);
+
+  useEffect(() => {
+    if (!embedded && pathname === "/criar") {
+      router.replace("/gerar?mode=ugc&kind=video");
+    }
+  }, [embedded, pathname, router]);
 
   useEffect(() => {
     void (async () => {
@@ -594,10 +604,18 @@ export default function CriarPage() {
     );
   }
 
+  if (!embedded && pathname === "/criar") {
+    return (
+      <p className="text-sm text-[var(--muted)]">
+        Abrindo Criar · Vídeo avançado…
+      </p>
+    );
+  }
+
   return (
     <div>
       <PageHeader
-        title="Estúdio"
+        title={embedded ? "Vídeo avançado" : "Estúdio"}
         subtitle="Avatar travada · roupa · imagem · vídeo com takes de 8 segundos."
         actions={
           <div className="flex flex-wrap items-center gap-2">

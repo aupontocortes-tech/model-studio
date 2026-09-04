@@ -1,12 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
-import GerarStudioPage from "./GerarClient";
+import CriarUnifiedClient from "./CriarUnifiedClient";
 
 export default function Page() {
   return (
     <Suspense fallback={<p className="text-sm text-[var(--muted)]">Carregando…</p>}>
-      <GerarStudioPage />
+      <CriarUnifiedClient />
     </Suspense>
   );
 }

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
-  Clapperboard,
   LayoutDashboard,
   Plus,
   Settings2,
@@ -17,7 +16,6 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 const NAV = [
   { href: "/gerar", label: "Criar", icon: Sparkles },
   { href: "/personagens", label: "Biblioteca", icon: UserRound },
-  { href: "/criar", label: "UGC vídeo", icon: Clapperboard },
   { href: "/", label: "Início", icon: LayoutDashboard },
   { href: "/configuracoes", label: "Ajustes", icon: Settings2 },
 ];

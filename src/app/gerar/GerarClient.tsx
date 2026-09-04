@@ -95,6 +95,7 @@ export default function GerarStudioPage() {
   const [sceneId, setSceneId] = useState("");
   const [keepSceneFromPhoto, setKeepSceneFromPhoto] = useState(true);
   const [kind, setKind] = useState<StudioMediaKind>("image");
+  const [loading, setLoading] = useState(true);
   const [includeVoice, setIncludeVoice] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -133,7 +134,7 @@ export default function GerarStudioPage() {
   const selectedOutfit = outfits.find((o) => o.id === outfitId);
   const selectedMovement = selected?.movements.find((m) => m.id === movementId);
   const selectedScene = scenes.find((s) => s.id === sceneId);
-  const wardrobeIds = selected?.outfitIds || [];
+  const wardrobeIds = useMemo(() => selected?.outfitIds || [], [selected]);
   const wornRefs = useMemo(
     () => collectWornPhotosForWardrobe(wardrobeIds, outfits),
     [wardrobeIds, outfits],
@@ -293,6 +294,7 @@ export default function GerarStudioPage() {
   }
 
   useEffect(() => {
+    setLoading(true);
     void (async () => {
       const [c, o, s, p] = await Promise.allSettled([
         api.studio.characters.list(),
@@ -311,13 +313,18 @@ export default function GerarStudioPage() {
       } else if (c.value.characters[0]) {
         setCharacterId(c.value.characters[0].id);
       }
-    })().catch((e) =>
-      setError(e instanceof Error ? e.message : "Falha ao carregar"),
-    );
+      const fromKind = search.get("kind");
+      if (fromKind === "video" || fromKind === "image") setKind(fromKind);
+    })()
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Falha ao carregar"),
+      )
+      .finally(() => setLoading(false));
   }, [search]);
 
   useEffect(() => {
-    setOutfitId("");
+    const fromOutfit = search.get("outfit");
+    setOutfitId(fromOutfit || "");
     setMovementId("");
     setSceneId("");
     setKeepSceneFromPhoto(true);
@@ -327,7 +334,7 @@ export default function GerarStudioPage() {
     setSelectedSavedPromptId("");
     setPromptDirty(false);
     setFullPrompt("");
-  }, [characterId]);
+  }, [characterId, search]);
 
   useEffect(() => {
     setPromptDirty(false);
@@ -456,6 +463,7 @@ export default function GerarStudioPage() {
         outfitId,
         characterId,
         slot: "worn",
+        appendWorn: Boolean(selectedOutfit?.wornImageUrl),
       });
       setOutfits((prev) =>
         prev.map((o) => (o.id === outfit.id ? outfit : o)),
@@ -590,17 +598,22 @@ export default function GerarStudioPage() {
     setBusy(true);
     setError("");
     try {
-      await api.studio.outfits.update(outfitId, {
-        wornImageUrl: agentJob.resultImageUrl,
-      });
-      setOutfits((prev) =>
-        prev.map((o) =>
-          o.id === outfitId
-            ? { ...o, wornImageUrl: agentJob.resultImageUrl }
-            : o,
-        ),
+      const current = outfits.find((outfit) => outfit.id === outfitId);
+      const { outfit } = await api.studio.outfits.update(
+        outfitId,
+        current?.wornImageUrl
+          ? {
+              wornGallery: [
+                ...(current.wornGallery || []),
+                agentJob.resultImageUrl,
+              ],
+            }
+          : { wornImageUrl: agentJob.resultImageUrl },
       );
-      setMsg("Still do Flow salvo em Ela vestida.");
+      setOutfits((prev) =>
+        prev.map((item) => (item.id === outfit.id ? outfit : item)),
+      );
+      setMsg("Still do Flow adicionado às fotos deste look.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Falha ao salvar no look.");
     } finally {
@@ -611,7 +624,7 @@ export default function GerarStudioPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
-        title="Criação"
+        title="Criar com a Biblioteca"
         subtitle="Escolha look → prompt → Enviar para Claude. Ele opera Tokfy, Flow ou outra ferramenta."
       />
 
@@ -653,7 +666,14 @@ export default function GerarStudioPage() {
         </Panel>
 
         <Panel title="2 · Personagem">
-          {characters.length === 0 ? (
+          {loading ? (
+            <div className="space-y-2" aria-label="Carregando personagens">
+              <div className="h-10 animate-pulse rounded-xl bg-[var(--panel-elevated)]" />
+              <p className="text-xs text-[var(--muted)]">
+                Carregando sua Biblioteca…
+              </p>
+            </div>
+          ) : characters.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
               Nenhuma personagem.{" "}
               <a className="text-[var(--accent)]" href="/personagens">
@@ -702,7 +722,16 @@ export default function GerarStudioPage() {
           <p className="mb-2 text-[13px] font-medium text-[var(--ink)]">
             Escolha o look — toque no card (Peça ou Vestida). A lupa só amplia.
           </p>
-          {wardrobe.length === 0 && otherOutfits.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4" aria-label="Carregando looks">
+              {[0, 1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="aspect-square animate-pulse rounded-xl bg-[var(--panel-elevated)]"
+                />
+              ))}
+            </div>
+          ) : wardrobe.length === 0 && otherOutfits.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">
               Sem looks. Cadastre a peça em{" "}
               <a className="text-[var(--accent)]" href="/personagens">
@@ -1011,7 +1040,7 @@ export default function GerarStudioPage() {
               accept="image/*,.heic,.heif"
               label={
                 selectedOutfit?.wornImageUrl
-                  ? "Trocar still no look"
+                  ? "Adicionar outro still ao look"
                   : "Enviar still gerado"
               }
               disabled={busy || !outfitId}

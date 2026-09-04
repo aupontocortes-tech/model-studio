@@ -10,7 +10,6 @@ import {
   Boxes,
   Clock3,
   FolderKanban,
-  ImagePlus,
   LockKeyhole,
   Sparkles,
   UserRound,
@@ -112,10 +111,10 @@ export default function DashboardPage() {
               <ArrowRight size={16} />
             </Link>
             <Link
-              href="/criar"
+              href="/gerar?mode=ugc&kind=video"
               className="inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-5 text-sm font-semibold text-[var(--ink)]"
             >
-              Fluxo UGC (avatar + roupa)
+              Vídeo avançado
             </Link>
           </div>
         </div>
