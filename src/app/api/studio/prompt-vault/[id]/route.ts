@@ -36,6 +36,10 @@ export async function PATCH(request: Request, ctx: Ctx) {
 
   const updated = await promptVaultRepo.upsert({
     ...existing,
+    area:
+      typeof body.area === "string" && body.area.trim()
+        ? body.area.trim().toLowerCase()
+        : existing.area || "comandos",
     title,
     purpose:
       typeof body.purpose === "string"

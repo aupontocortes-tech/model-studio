@@ -18,9 +18,53 @@ import {
   Pencil,
   Plus,
   Search,
+  Terminal,
   Trash2,
   X,
 } from "lucide-react";
+
+const TODOS = "todos" as const;
+const COMANDOS = "comandos" as const;
+const AREAS_KEY = "ms-prompt-vault-areas";
+
+type SegmentId = typeof TODOS | string;
+
+function slugifyArea(label: string) {
+  return label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+function areaLabel(id: string) {
+  if (id === COMANDOS) return "Comandos";
+  return id
+    .split("-")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function loadExtraAreas(): string[] {
+  try {
+    const raw = localStorage.getItem(AREAS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((x) => String(x).trim().toLowerCase())
+      .filter((x) => x && x !== COMANDOS && x !== TODOS);
+  } catch {
+    return [];
+  }
+}
+
+function saveExtraAreas(areas: string[]) {
+  localStorage.setItem(AREAS_KEY, JSON.stringify(areas));
+}
 
 const EMPTY_FORM = {
   title: "",
@@ -48,12 +92,14 @@ function previewText(text: string, max = 110) {
   return `${clean.slice(0, max).trim()}…`;
 }
 
-export default function PromptsVaultPage() {
+export default function PromptsPage() {
   const [items, setItems] = useState<PromptVaultItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("browse");
   const [form, setForm] = useState(EMPTY_FORM);
   const [query, setQuery] = useState("");
+  const [segment, setSegment] = useState<SegmentId>(TODOS);
+  const [extraAreas, setExtraAreas] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -66,29 +112,55 @@ export default function PromptsVaultPage() {
   }, []);
 
   useEffect(() => {
+    setExtraAreas(loadExtraAreas());
+  }, []);
+
+  useEffect(() => {
     void reload().catch((e) =>
       setError(e instanceof Error ? e.message : "Falha ao carregar prompts."),
     );
   }, [reload]);
 
+  const segments = useMemo(() => {
+    const fromItems = items
+      .map((item) => (item.area || COMANDOS).toLowerCase())
+      .filter(Boolean);
+    const set = new Set<string>([COMANDOS, ...extraAreas, ...fromItems]);
+    set.delete(TODOS);
+    const rest = [...set]
+      .filter((id) => id !== COMANDOS)
+      .sort((a, b) => areaLabel(a).localeCompare(areaLabel(b), "pt-BR"));
+    return [COMANDOS, ...rest];
+  }, [items, extraAreas]);
+
+  const activeArea =
+    segment === TODOS ? COMANDOS : segment || COMANDOS;
+
+  const inSegment = useMemo(() => {
+    if (segment === TODOS) return items;
+    return items.filter(
+      (item) => (item.area || COMANDOS).toLowerCase() === segment,
+    );
+  }, [items, segment]);
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    for (const item of items) {
+    for (const item of inSegment) {
       for (const tag of item.tags) set.add(tag);
     }
     return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [items]);
+  }, [inSegment]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items.filter((item) => {
+    return inSegment.filter((item) => {
       if (tagFilter && !item.tags.includes(tagFilter)) return false;
       if (!q) return true;
       const hay =
         `${item.title} ${item.purpose} ${item.body} ${item.tags.join(" ")}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [items, query, tagFilter]);
+  }, [inSegment, query, tagFilter]);
 
   const selected = items.find((item) => item.id === selectedId) || null;
 
@@ -102,6 +174,34 @@ export default function PromptsVaultPage() {
     setForm(EMPTY_FORM);
     setMode("create");
     clearFlash();
+  }
+
+  function selectSegment(next: SegmentId) {
+    setSegment(next);
+    setTagFilter(null);
+    clearFlash();
+  }
+
+  function addSegment() {
+    const raw = window.prompt(
+      "Nome do novo ícone/segmento (ex.: Looks, Vídeo, UGC):",
+    );
+    if (!raw) return;
+    const id = slugifyArea(raw);
+    if (!id || id === TODOS) {
+      setError("Nome inválido para o segmento.");
+      return;
+    }
+    if (id === COMANDOS || segments.includes(id)) {
+      selectSegment(id);
+      setMsg(`Abrindo ${areaLabel(id)}.`);
+      return;
+    }
+    const next = [...extraAreas, id];
+    setExtraAreas(next);
+    saveExtraAreas(next);
+    selectSegment(id);
+    setMsg(`Segmento "${areaLabel(id)}" criado. Pode adicionar prompts nele.`);
   }
 
   function openItem(item: PromptVaultItem) {
@@ -161,7 +261,7 @@ export default function PromptsVaultPage() {
     const title = form.title.trim();
     const body = form.body.trim();
     if (!title || !body) {
-      setError("Preencha o nome e o texto do prompt para guardar.");
+      setError("Preencha o nome e o texto do comando para guardar.");
       setMsg("");
       return;
     }
@@ -174,6 +274,7 @@ export default function PromptsVaultPage() {
         purpose: form.purpose.trim(),
         body,
         tags: form.tags,
+        area: activeArea,
       };
       if (mode === "edit" && selectedId) {
         const { prompt } = await api.studio.promptVault.update(
@@ -187,13 +288,13 @@ export default function PromptsVaultPage() {
         );
         setSelectedId(prompt.id);
         setMode("open");
-        setMsg("Prompt atualizado.");
+        setMsg("Comando atualizado.");
       } else {
         const { prompt } = await api.studio.promptVault.create(payload);
         setItems((prev) => [prompt, ...prev]);
         setSelectedId(prompt.id);
         setMode("open");
-        setMsg("Prompt guardado.");
+        setMsg("Comando guardado.");
       }
     } catch (e) {
       setError(
@@ -212,14 +313,14 @@ export default function PromptsVaultPage() {
   }
 
   async function removeItem(id: string) {
-    if (!window.confirm("Excluir este prompt?")) return;
+    if (!window.confirm("Excluir este comando?")) return;
     setBusy(true);
     clearFlash();
     try {
       await api.studio.promptVault.remove(id);
       setItems((prev) => prev.filter((item) => item.id !== id));
       if (selectedId === id) closeDetail();
-      setMsg("Prompt excluído.");
+      setMsg("Comando excluído.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível excluir.");
     } finally {
@@ -242,7 +343,7 @@ export default function PromptsVaultPage() {
     <div>
       <PageHeader
         title="Prompts"
-        subtitle="Blocos salvos prontos para abrir ou copiar e colar."
+        subtitle="Todos os segmentos — Comandos e os que você adicionar."
         actions={
           <Button type="button" onClick={startCreate}>
             <Plus size={16} />
@@ -257,7 +358,7 @@ export default function PromptsVaultPage() {
             O que é
           </p>
           <p className="mt-2 text-base font-semibold leading-6 text-[var(--ink)]">
-            Prompt = o texto que você manda para a IA.
+            Prompt = texto pronto para colar na IA.
           </p>
         </div>
         <div className="rounded-2xl border border-emerald-500/25 bg-[var(--success-bg)] p-4">
@@ -265,7 +366,7 @@ export default function PromptsVaultPage() {
             Para que serve
           </p>
           <p className="mt-2 text-base font-semibold leading-6 text-[var(--ink)]">
-            Guardar instruções boas e reutilizar sem reescrever.
+            Organizar por segmentos: Comandos e outros ícones.
           </p>
         </div>
         <div className="rounded-2xl border border-sky-500/25 bg-[var(--info-bg)] p-4">
@@ -273,7 +374,7 @@ export default function PromptsVaultPage() {
             Como usar
           </p>
           <p className="mt-2 text-base font-semibold leading-6 text-[var(--ink)]">
-            Toque no bloco → <strong>Abrir</strong> ou <strong>Copiar</strong>.
+            Em <strong>Todos</strong>, escolha <strong>Comandos</strong> ou adicione outro ícone.
           </p>
         </div>
       </section>
@@ -290,8 +391,8 @@ export default function PromptsVaultPage() {
       ) : null}
 
       <Panel
-        title="Seus prompts salvos"
-        description={`${filtered.length} bloco(s) · toque para abrir ou copiar`}
+        title="Seus prompts"
+        description={`${filtered.length} prompt(s) · toque para posicionar, editar ou copiar`}
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative min-w-0 flex-1">
@@ -307,8 +408,49 @@ export default function PromptsVaultPage() {
             />
           </div>
           <p className="text-xs text-[var(--muted)] sm:whitespace-nowrap">
-            {items.length} no cofre
+            {inSegment.length}
+            {segment === TODOS
+              ? " no total"
+              : ` em ${areaLabel(segment)}`}
           </p>
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => selectSegment(TODOS)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              segment === TODOS
+                ? "bg-[var(--accent)] text-white"
+                : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)] hover:border-[var(--accent)]"
+            }`}
+          >
+            Todos
+          </button>
+          {segments.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => selectSegment(id)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                segment === id
+                  ? "bg-[var(--accent)] text-white"
+                  : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)] hover:border-[var(--accent)]"
+              }`}
+            >
+              {id === COMANDOS ? <Terminal size={12} /> : null}
+              {areaLabel(id)}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={addSegment}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--accent)]/50 bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)] hover:border-[var(--accent)]"
+            title="Adicionar outro ícone/segmento"
+          >
+            <Plus size={12} />
+            Ícone
+          </button>
         </div>
 
         {allTags.length > 0 ? (
@@ -316,13 +458,13 @@ export default function PromptsVaultPage() {
             <button
               type="button"
               onClick={() => setTagFilter(null)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+              className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition ${
                 !tagFilter
-                  ? "bg-[var(--accent)] text-white"
+                  ? "border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]"
                   : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)] hover:border-[var(--accent)]"
               }`}
             >
-              Todos
+              Todas as tags
             </button>
             {allTags.map((tag) => (
               <button
@@ -331,9 +473,9 @@ export default function PromptsVaultPage() {
                 onClick={() =>
                   setTagFilter((prev) => (prev === tag ? null : tag))
                 }
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                className={`rounded-lg px-3 py-1.5 text-[11px] font-medium transition ${
                   tagFilter === tag
-                    ? "bg-[var(--accent)] text-white"
+                    ? "border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "border border-[var(--line)] bg-[var(--panel-elevated)] text-[var(--muted)] hover:border-[var(--accent)]"
                 }`}
               >
@@ -399,7 +541,7 @@ export default function PromptsVaultPage() {
 
                       <div className="px-4 py-3">
                         <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
-                          Trecho do prompt
+                          Trecho do comando
                         </p>
                         <p className="mt-1.5 line-clamp-3 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-3 py-2.5 font-mono text-[12px] leading-5 text-[var(--ink)]">
                           {previewText(item.body, 140)}
@@ -443,7 +585,7 @@ export default function PromptsVaultPage() {
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-2 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)]"
                       >
                         {copied ? <Check size={15} /> : <Copy size={15} />}
-                        {copied ? "Ok" : "Prompt"}
+                        {copied ? "Ok" : "Copiar"}
                       </button>
                       <button
                         type="button"
@@ -471,7 +613,7 @@ export default function PromptsVaultPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
-                Prompt aberto
+                Comando aberto
               </p>
               <h2 className="mt-1 text-2xl font-bold tracking-[-0.03em] text-[var(--ink)]">
                 {selected.title}
@@ -520,7 +662,7 @@ export default function PromptsVaultPage() {
               ) : (
                 <Copy size={14} />
               )}
-              {copiedId === selected.id ? "Copiado" : "Copiar prompt"}
+              {copiedId === selected.id ? "Copiado" : "Copiar comando"}
             </Button>
             <Button type="button" variant="secondary" onClick={startEdit}>
               <Pencil size={14} />
@@ -546,8 +688,8 @@ export default function PromptsVaultPage() {
       {mode === "create" || mode === "edit" ? (
         <div id="prompt-detail" className="mt-5 scroll-mt-6">
           <Panel
-            title={mode === "edit" ? "Editar prompt" : "Novo prompt"}
-            description="Preencha nome, para que serve e o texto. Depois ele vira um bloco."
+            title={mode === "edit" ? "Editar comando" : "Novo comando"}
+            description="Preencha nome, para que serve e o texto. Depois ele fica salvo no segmento atual."
           >
             <div className="grid gap-3">
               <Field label="Nome">
@@ -573,14 +715,14 @@ export default function PromptsVaultPage() {
                   placeholder="Ex.: Vídeo 9:16 trocando look sem morphing"
                 />
               </Field>
-              <Field label="O prompt" hint="Cole o texto completo da IA.">
+              <Field label="O comando" hint="Cole o texto completo do comando.">
                 <textarea
                   className={`${inputClass} min-h-[260px] font-mono text-[11px] leading-4`}
                   value={form.body}
                   onChange={(e) =>
                     setForm((prev) => ({ ...prev, body: e.target.value }))
                   }
-                  placeholder="Cole aqui o prompt…"
+                  placeholder="Cole aqui o comando…"
                 />
               </Field>
               <Field
@@ -612,7 +754,7 @@ export default function PromptsVaultPage() {
                 ) : (
                   <>
                     <Plus size={14} />
-                    Salvar prompt
+                    Salvar comando
                   </>
                 )}
               </Button>

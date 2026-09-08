@@ -396,17 +396,22 @@ export const api = {
         ),
     },
     promptVault: {
-      list: () =>
-        fetch("/api/studio/prompt-vault").then((r) =>
+      list: (opts?: { area?: string }) => {
+        const q = opts?.area
+          ? `?area=${encodeURIComponent(opts.area)}`
+          : "";
+        return fetch(`/api/studio/prompt-vault${q}`).then((r) =>
           parse<{ prompts: import("@/domain/studioAssets").PromptVaultItem[] }>(
             r,
           ),
-        ),
+        );
+      },
       create: (body: {
         title: string;
         purpose?: string;
         body: string;
         tags?: string[] | string;
+        area?: string;
       }) =>
         fetch("/api/studio/prompt-vault", {
           method: "POST",
@@ -422,6 +427,7 @@ export const api = {
           purpose?: string;
           body?: string;
           tags?: string[] | string;
+          area?: string;
         },
       ) =>
         fetch(`/api/studio/prompt-vault/${id}`, {

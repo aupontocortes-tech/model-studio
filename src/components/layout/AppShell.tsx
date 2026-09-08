@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  MessageSquareText,
   Plus,
-  ScrollText,
   Settings2,
   Sparkles,
   UserRound,
@@ -19,7 +19,7 @@ const NAV = [
   { href: "/personagens", label: "Biblioteca", icon: UserRound },
   { href: "/", label: "Início", icon: LayoutDashboard },
   { href: "/configuracoes", label: "Ajustes", icon: Settings2 },
-  { href: "/prompts", label: "Prompts", icon: ScrollText },
+  { href: "/prompts", label: "Prompts", icon: MessageSquareText },
 ];
 
 function navActive(pathname: string, href: string) {
@@ -30,6 +30,9 @@ function navActive(pathname: string, href: string) {
       pathname.startsWith("/roupas") ||
       pathname.startsWith("/cenarios")
     );
+  }
+  if (href === "/prompts") {
+    return pathname.startsWith("/prompts") || pathname.startsWith("/comandos");
   }
   return pathname.startsWith(href);
 }

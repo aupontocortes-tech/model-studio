@@ -206,9 +206,14 @@ export interface SavedStudioPrompt {
   createdAt: string;
 }
 
+/** Áreas do cofre — hoje: Comandos; outras áreas entram depois. */
+export type PromptVaultArea = "comandos" | string;
+
 /** Cofre livre: prompts soltos, com ou sem relação com a criação. */
 export interface PromptVaultItem {
   id: string;
+  /** Área do cofre (ex.: comandos). */
+  area: PromptVaultArea;
   title: string;
   /** Para que serve este prompt */
   purpose: string;
