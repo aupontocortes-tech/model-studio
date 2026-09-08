@@ -208,16 +208,20 @@ export default function PromptsVaultPage() {
 
   async function removeSelected() {
     if (!selectedId) return;
+    await removeItem(selectedId);
+  }
+
+  async function removeItem(id: string) {
     if (!window.confirm("Excluir este prompt?")) return;
     setBusy(true);
     clearFlash();
     try {
-      await api.studio.promptVault.remove(selectedId);
-      setItems((prev) => prev.filter((item) => item.id !== selectedId));
-      closeDetail();
-      setMsg("Prompt removido.");
+      await api.studio.promptVault.remove(id);
+      setItems((prev) => prev.filter((item) => item.id !== id));
+      if (selectedId === id) closeDetail();
+      setMsg("Prompt excluído.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível apagar.");
+      setError(e instanceof Error ? e.message : "Não foi possível excluir.");
     } finally {
       setBusy(false);
     }
@@ -416,14 +420,14 @@ export default function PromptsVaultPage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-auto grid grid-cols-3 gap-2 px-4 pb-4">
+                    <div className="mt-auto grid grid-cols-2 gap-2 px-4 pb-3 sm:grid-cols-4">
                       <button
                         type="button"
                         onClick={() => openItem(item)}
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-[var(--accent)] px-2 text-sm font-semibold text-white hover:bg-[var(--accent-hover)]"
                       >
                         <Eye size={15} />
-                        Abrir
+                        Posicionar
                       </button>
                       <button
                         type="button"
@@ -439,7 +443,16 @@ export default function PromptsVaultPage() {
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-2 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)]"
                       >
                         {copied ? <Check size={15} /> : <Copy size={15} />}
-                        {copied ? "Ok" : "Copiar"}
+                        {copied ? "Ok" : "Prompt"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void removeItem(item.id)}
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/10 px-2 text-sm font-semibold text-red-300 hover:border-red-400 disabled:opacity-50"
+                      >
+                        <Trash2 size={15} />
+                        Excluir
                       </button>
                     </div>
                   </article>
@@ -511,7 +524,7 @@ export default function PromptsVaultPage() {
             </Button>
             <Button type="button" variant="secondary" onClick={startEdit}>
               <Pencil size={14} />
-              Editar / modificar
+              Fazer modificações
             </Button>
             <Button
               type="button"
