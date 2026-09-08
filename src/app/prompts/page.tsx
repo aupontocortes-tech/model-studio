@@ -133,6 +133,23 @@ export default function PromptsVaultPage() {
     clearFlash();
   }
 
+  function editItem(item: PromptVaultItem) {
+    setSelectedId(item.id);
+    setForm({
+      title: item.title,
+      purpose: item.purpose,
+      body: item.body,
+      tags: item.tags.join(", "),
+    });
+    setMode("edit");
+    clearFlash();
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("prompt-detail")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   function closeDetail() {
     setSelectedId(null);
     setForm(EMPTY_FORM);
@@ -141,13 +158,21 @@ export default function PromptsVaultPage() {
   }
 
   async function save() {
+    const title = form.title.trim();
+    const body = form.body.trim();
+    if (!title || !body) {
+      setError("Preencha o nome e o texto do prompt para guardar.");
+      setMsg("");
+      return;
+    }
+
     setBusy(true);
     clearFlash();
     try {
       const payload = {
-        title: form.title.trim(),
+        title,
         purpose: form.purpose.trim(),
-        body: form.body.trim(),
+        body,
         tags: form.tags,
       };
       if (mode === "edit" && selectedId) {
@@ -171,7 +196,11 @@ export default function PromptsVaultPage() {
         setMsg("Prompt guardado.");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Não foi possível salvar.");
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Não foi possível salvar. Tente de novo.",
+      );
     } finally {
       setBusy(false);
     }
@@ -179,7 +208,7 @@ export default function PromptsVaultPage() {
 
   async function removeSelected() {
     if (!selectedId) return;
-    if (!window.confirm("Apagar este prompt?")) return;
+    if (!window.confirm("Excluir este prompt?")) return;
     setBusy(true);
     clearFlash();
     try {
@@ -211,7 +240,7 @@ export default function PromptsVaultPage() {
         title="Prompts"
         subtitle="Blocos salvos prontos para abrir ou copiar e colar."
         actions={
-          <Button onClick={startCreate}>
+          <Button type="button" onClick={startCreate}>
             <Plus size={16} />
             Novo prompt
           </Button>
@@ -387,7 +416,7 @@ export default function PromptsVaultPage() {
                       </div>
                     ) : null}
 
-                    <div className="mt-auto grid grid-cols-2 gap-2 px-4 pb-4">
+                    <div className="mt-auto grid grid-cols-3 gap-2 px-4 pb-4">
                       <button
                         type="button"
                         onClick={() => openItem(item)}
@@ -398,11 +427,19 @@ export default function PromptsVaultPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => editItem(item)}
+                        className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-2 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)]"
+                      >
+                        <Pencil size={15} />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void copyBody(item)}
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel-elevated)] px-2 text-sm font-semibold text-[var(--ink)] hover:border-[var(--accent)]"
                       >
                         {copied ? <Check size={15} /> : <Copy size={15} />}
-                        {copied ? "Copiado" : "Copiar"}
+                        {copied ? "Ok" : "Copiar"}
                       </button>
                     </div>
                   </article>
@@ -464,25 +501,26 @@ export default function PromptsVaultPage() {
           </pre>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => void copyBody(selected)}>
+            <Button type="button" onClick={() => void copyBody(selected)}>
               {copiedId === selected.id ? (
                 <Check size={14} />
               ) : (
                 <Copy size={14} />
               )}
-              {copiedId === selected.id ? "Copiado" : "Copiar para colar"}
+              {copiedId === selected.id ? "Copiado" : "Copiar prompt"}
             </Button>
-            <Button variant="secondary" onClick={startEdit}>
+            <Button type="button" variant="secondary" onClick={startEdit}>
               <Pencil size={14} />
-              Editar
+              Editar / modificar
             </Button>
             <Button
+              type="button"
               variant="danger"
               disabled={busy}
               onClick={() => void removeSelected()}
             >
               <Trash2 size={14} />
-              Apagar
+              Excluir
             </Button>
           </div>
           <p className="mt-3 text-xs text-[var(--muted)]">
@@ -549,19 +587,19 @@ export default function PromptsVaultPage() {
 
             <div className="mt-4 flex flex-wrap gap-2">
               <Button
+                type="button"
                 loading={busy}
-                disabled={!form.title.trim() || !form.body.trim()}
                 onClick={() => void save()}
               >
                 {mode === "edit" ? (
                   <>
                     <Pencil size={14} />
-                    Salvar alterações
+                    Salvar modificações
                   </>
                 ) : (
                   <>
                     <Plus size={14} />
-                    Guardar bloco
+                    Salvar prompt
                   </>
                 )}
               </Button>
