@@ -1,4 +1,5 @@
 import type {
+  PromptVaultItem,
   SavedStudioPrompt,
   StudioCharacter,
   StudioMovement,
@@ -93,3 +94,4 @@ export const studioScriptRepo = makeRepo<StudioScript>("studio-scripts.json");
 export const savedStudioPromptRepo = makeRepo<SavedStudioPrompt>(
   "studio-saved-prompts.json",
 );
+export const promptVaultRepo = makeRepo<PromptVaultItem>("prompt-vault.json");

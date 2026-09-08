@@ -395,6 +395,47 @@ export const api = {
           }>(r),
         ),
     },
+    promptVault: {
+      list: () =>
+        fetch("/api/studio/prompt-vault").then((r) =>
+          parse<{ prompts: import("@/domain/studioAssets").PromptVaultItem[] }>(
+            r,
+          ),
+        ),
+      create: (body: {
+        title: string;
+        purpose?: string;
+        body: string;
+        tags?: string[] | string;
+      }) =>
+        fetch("/api/studio/prompt-vault", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ prompt: import("@/domain/studioAssets").PromptVaultItem }>(r),
+        ),
+      update: (
+        id: string,
+        body: {
+          title?: string;
+          purpose?: string;
+          body?: string;
+          tags?: string[] | string;
+        },
+      ) =>
+        fetch(`/api/studio/prompt-vault/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((r) =>
+          parse<{ prompt: import("@/domain/studioAssets").PromptVaultItem }>(r),
+        ),
+      remove: (id: string) =>
+        fetch(`/api/studio/prompt-vault/${id}`, { method: "DELETE" }).then(
+          (r) => parse<{ ok: boolean }>(r),
+        ),
+    },
       tryOnFlow: (body: {
       characterId: string;
       outfitId: string;

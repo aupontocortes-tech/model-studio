@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Plus,
+  ScrollText,
   Settings2,
   Sparkles,
   UserRound,
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/personagens", label: "Biblioteca", icon: UserRound },
   { href: "/", label: "Início", icon: LayoutDashboard },
   { href: "/configuracoes", label: "Ajustes", icon: Settings2 },
+  { href: "/prompts", label: "Prompts", icon: ScrollText },
 ];
 
 function navActive(pathname: string, href: string) {

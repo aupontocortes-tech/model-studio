@@ -206,6 +206,19 @@ export interface SavedStudioPrompt {
   createdAt: string;
 }
 
+/** Cofre livre: prompts soltos, com ou sem relação com a criação. */
+export interface PromptVaultItem {
+  id: string;
+  title: string;
+  /** Para que serve este prompt */
+  purpose: string;
+  /** Texto do prompt (o que você cola no Claude, Flow, ChatGPT etc.) */
+  body: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const CREATIVE_DIRECTOR_SYSTEM_PROMPT = `Você é diretor criativo de conteúdo UGC. Responda em português, com instruções visuais precisas. Preserve SEMPRE a identidade fixa da personagem (rosto, cabelo, olhos, tom de pele, tipo físico e personalidade). Roupa, cenário e movimento podem variar. Se houver voz cadastrada, preserve o timbre.`;
 
 export function emptyVoice(): CharacterVoice {
