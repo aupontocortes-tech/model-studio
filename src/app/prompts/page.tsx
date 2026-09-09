@@ -101,7 +101,7 @@ export default function PromptsPage() {
   const [mode, setMode] = useState<Mode>("browse");
   const [form, setForm] = useState(EMPTY_FORM);
   const [query, setQuery] = useState("");
-  const [segment, setSegment] = useState<SegmentId>(TODOS);
+  const [segment, setSegment] = useState<SegmentId>(COMANDOS);
   const [extraAreas, setExtraAreas] = useState<string[]>([]);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

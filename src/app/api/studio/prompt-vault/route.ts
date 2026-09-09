@@ -1,16 +1,27 @@
 import type { PromptVaultArea, PromptVaultItem } from "@/domain/studioAssets";
 import { isNeonEnabled } from "@/db/neon";
 import {
+  isNeonQuotaCircuitOpen,
+  markNeonQuotaHit,
+} from "@/db/neonQuotaCircuit";
+import {
   isNeonQuotaError,
   neonPromptVaultAppend,
   neonPromptVaultMeta,
   neonPromptVaultPage,
 } from "@/db/promptVaultNeon";
 import { jsonError, jsonOk, createId, nowIso } from "@/lib/studioCrud";
+import { readJsonFile } from "@/storage/fs";
 import { promptVaultRepo } from "@/storage/studioRepos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const VAULT_FILE = "prompt-vault.json";
+
+async function readLocalVault(): Promise<PromptVaultItem[]> {
+  return readJsonFile<PromptVaultItem[]>(VAULT_FILE, []);
+}
 
 function parseTags(raw: unknown): string[] {
   if (Array.isArray(raw)) {
@@ -91,6 +102,27 @@ function pageFromLocal(
   };
 }
 
+function localMeta(local: PromptVaultItem[], warning?: string) {
+  const areas = new Map<string, number>();
+  for (const item of local) {
+    const key = (item.area || "comandos").toLowerCase();
+    areas.set(key, (areas.get(key) || 0) + 1);
+  }
+  return {
+    meta: {
+      total: local.length,
+      bytes: null as number | null,
+      updatedAt: null as string | null,
+      areas: [...areas.entries()].map(([a, count]) => ({
+        area: a,
+        count,
+      })),
+      source: warning ? "local-fallback" : "local",
+      ...(warning ? { warning } : {}),
+    },
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -99,8 +131,23 @@ export async function GET(request: Request) {
     const q = url.searchParams.get("q")?.trim().toLowerCase() || null;
     const fields =
       url.searchParams.get("fields") === "full" ? "full" : "summary";
-    const limit = Number(url.searchParams.get("limit") || 50);
-    const offset = Number(url.searchParams.get("offset") || 0);
+    const limit = Math.min(Math.max(Number(url.searchParams.get("limit") || 50), 1), 200);
+    const offset = Math.max(Number(url.searchParams.get("offset") || 0), 0);
+
+    const serveLocal = async (warning?: string) => {
+      const local = (await readLocalVault()).map(withArea);
+      if (wantMeta) return jsonOk(localMeta(local, warning));
+      if (!local.length && warning) return jsonError(warning, 503);
+      return jsonOk({
+        ...pageFromLocal(local, { area, q, limit, offset, fields }),
+        ...(warning ? { warning, source: "local-fallback" } : { source: "local" }),
+      });
+    };
+
+    // Circuito aberto: não espera Neon de novo (localhost fica rápido).
+    if (isNeonQuotaCircuitOpen()) {
+      return serveLocal(quotaMessage());
+    }
 
     if (wantMeta) {
       if (isNeonEnabled()) {
@@ -109,47 +156,13 @@ export async function GET(request: Request) {
           return jsonOk({ meta });
         } catch (err) {
           if (isNeonQuotaError(err)) {
-            const local = (await promptVaultRepo.all()).map(withArea);
-            const areas = new Map<string, number>();
-            for (const item of local) {
-              const key = (item.area || "comandos").toLowerCase();
-              areas.set(key, (areas.get(key) || 0) + 1);
-            }
-            return jsonOk({
-              meta: {
-                total: local.length,
-                bytes: null,
-                updatedAt: null,
-                areas: [...areas.entries()].map(([a, count]) => ({
-                  area: a,
-                  count,
-                })),
-                source: "local-fallback",
-                warning: quotaMessage(),
-              },
-            });
+            markNeonQuotaHit();
+            return serveLocal(quotaMessage());
           }
           throw err;
         }
       }
-      const local = (await promptVaultRepo.all()).map(withArea);
-      const areas = new Map<string, number>();
-      for (const item of local) {
-        const key = (item.area || "comandos").toLowerCase();
-        areas.set(key, (areas.get(key) || 0) + 1);
-      }
-      return jsonOk({
-        meta: {
-          total: local.length,
-          bytes: null,
-          updatedAt: null,
-          areas: [...areas.entries()].map(([a, count]) => ({
-            area: a,
-            count,
-          })),
-          source: "local",
-        },
-      });
+      return serveLocal();
     }
 
     if (isNeonEnabled()) {
@@ -164,43 +177,38 @@ export async function GET(request: Request) {
         return jsonOk(page);
       } catch (err) {
         if (!isNeonQuotaError(err)) throw err;
-        // Fallback local (dev) — em produção sem arquivo local, avisa sem inventar dados.
-        try {
-          const local = (await promptVaultRepo.all()).map(withArea);
-          if (local.length > 0) {
-            return jsonOk({
-              ...pageFromLocal(local, {
-                area,
-                q,
-                limit: Math.min(Math.max(limit || 50, 1), 200),
-                offset: Math.max(offset || 0, 0),
-                fields,
-              }),
-              warning: quotaMessage(),
-              source: "local-fallback",
-            });
-          }
-        } catch {
-          /* ignore */
-        }
-        return jsonError(quotaMessage(), 503);
+        markNeonQuotaHit();
+        return serveLocal(quotaMessage());
       }
     }
 
-    const local = (await promptVaultRepo.all()).map(withArea);
-    return jsonOk(
-      pageFromLocal(local, {
-        area,
-        q,
-        limit: Math.min(Math.max(limit || 50, 1), 200),
-        offset: Math.max(offset || 0, 0),
-        fields,
-      }),
-    );
+    return serveLocal();
   } catch (err) {
     console.error("[prompt-vault GET]", err);
     const msg = err instanceof Error ? err.message : "Falha ao listar prompts.";
-    if (isNeonQuotaError(err)) return jsonError(quotaMessage(), 503);
+    if (isNeonQuotaError(err)) {
+      markNeonQuotaHit();
+      try {
+        const local = (await readLocalVault()).map(withArea);
+        if (local.length) {
+          const url = new URL(request.url);
+          return jsonOk({
+            ...pageFromLocal(local, {
+              area: url.searchParams.get("area")?.trim().toLowerCase() || null,
+              q: url.searchParams.get("q")?.trim().toLowerCase() || null,
+              limit: 50,
+              offset: 0,
+              fields: "summary",
+            }),
+            warning: quotaMessage(),
+            source: "local-fallback",
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+      return jsonError(quotaMessage(), 503);
+    }
     return jsonError(msg, 500);
   }
 }
@@ -231,23 +239,34 @@ export async function POST(request: Request) {
       updatedAt: now,
     };
 
-    if (isNeonEnabled()) {
+    if (isNeonEnabled() && !isNeonQuotaCircuitOpen()) {
       try {
         await neonPromptVaultAppend(item);
         return jsonOk({ prompt: item }, { status: 201 });
       } catch (err) {
         if (!isNeonQuotaError(err)) throw err;
-        // fallback local
-        await promptVaultRepo.upsert(item);
-        return jsonOk(
-          { prompt: item, warning: quotaMessage(), source: "local-fallback" },
-          { status: 201 },
-        );
+        markNeonQuotaHit();
       }
     }
 
     await promptVaultRepo.upsert(item);
-    return jsonOk({ prompt: item }, { status: 201 });
+    // Espelha direto no arquivo local também
+    const local = await readLocalVault();
+    const idx = local.findIndex((x) => x.id === item.id);
+    if (idx >= 0) local[idx] = item;
+    else local.push(item);
+    const { writeJsonFile } = await import("@/storage/fs");
+    await writeJsonFile(VAULT_FILE, local);
+
+    return jsonOk(
+      {
+        prompt: item,
+        ...(isNeonQuotaCircuitOpen()
+          ? { warning: quotaMessage(), source: "local-fallback" }
+          : {}),
+      },
+      { status: 201 },
+    );
   } catch (err) {
     console.error("[prompt-vault POST]", err);
     const msg = err instanceof Error ? err.message : "Falha ao salvar prompt.";

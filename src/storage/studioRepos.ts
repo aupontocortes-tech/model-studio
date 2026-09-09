@@ -7,6 +7,10 @@ import type {
   StudioScene,
   StudioScript,
 } from "@/domain/studioAssets";
+import {
+  isNeonQuotaCircuitOpen,
+  markNeonQuotaHit,
+} from "@/db/neonQuotaCircuit";
 import { isNeonEnabled, neonReadCollection, neonWriteCollection } from "@/db/neon";
 import { readJsonFile, writeJsonFile } from "@/storage/fs";
 
@@ -43,11 +47,12 @@ function isNeonQuotaOrUnavailable(err: unknown) {
 function makeRepo<T extends { id: string }>(file: string) {
   return {
     async all(): Promise<T[]> {
-      if (isNeonEnabled()) {
+      if (isNeonEnabled() && !isNeonQuotaCircuitOpen()) {
         try {
           return await neonReadCollection<T>(file);
         } catch (err) {
           if (isNeonQuotaOrUnavailable(err)) {
+            markNeonQuotaHit();
             console.warn(
               `[studioRepos] Neon indisponível para ${file}; usando JSON local.`,
               err instanceof Error ? err.message : err,
