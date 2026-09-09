@@ -6,7 +6,21 @@ import type {
 } from "@/domain/types";
 
 async function parse<T>(res: Response): Promise<T> {
-  const data = await res.json();
+  const text = await res.text();
+  let data: { error?: string } = {};
+  if (text) {
+    try {
+      data = JSON.parse(text) as { error?: string };
+    } catch {
+      throw new Error(
+        res.ok
+          ? "Resposta inválida do servidor."
+          : `Falha na requisição (${res.status}).`,
+      );
+    }
+  } else if (!res.ok) {
+    throw new Error(`Falha na requisição (${res.status}).`);
+  }
   if (!res.ok) throw new Error(data.error || "Falha na requisição");
   return data as T;
 }
@@ -396,16 +410,49 @@ export const api = {
         ),
     },
     promptVault: {
-      list: (opts?: { area?: string }) => {
-        const q = opts?.area
-          ? `?area=${encodeURIComponent(opts.area)}`
-          : "";
-        return fetch(`/api/studio/prompt-vault${q}`).then((r) =>
-          parse<{ prompts: import("@/domain/studioAssets").PromptVaultItem[] }>(
-            r,
-          ),
+      meta: () =>
+        fetch("/api/studio/prompt-vault?meta=1").then((r) =>
+          parse<{
+            meta: {
+              total: number;
+              bytes: number | null;
+              updatedAt: string | null;
+              areas: { area: string; count: number }[];
+              warning?: string;
+              source?: string;
+            };
+          }>(r),
+        ),
+      list: (opts?: {
+        area?: string;
+        q?: string;
+        limit?: number;
+        offset?: number;
+        fields?: "summary" | "full";
+      }) => {
+        const params = new URLSearchParams();
+        if (opts?.area) params.set("area", opts.area);
+        if (opts?.q) params.set("q", opts.q);
+        if (opts?.limit != null) params.set("limit", String(opts.limit));
+        if (opts?.offset != null) params.set("offset", String(opts.offset));
+        params.set("fields", opts?.fields || "summary");
+        const qs = params.toString();
+        return fetch(`/api/studio/prompt-vault?${qs}`).then((r) =>
+          parse<{
+            prompts: import("@/domain/studioAssets").PromptVaultItem[];
+            total: number;
+            limit: number;
+            offset: number;
+            hasMore: boolean;
+            warning?: string;
+            source?: string;
+          }>(r),
         );
       },
+      get: (id: string) =>
+        fetch(`/api/studio/prompt-vault/${id}`).then((r) =>
+          parse<{ prompt: import("@/domain/studioAssets").PromptVaultItem }>(r),
+        ),
       create: (body: {
         title: string;
         purpose?: string;

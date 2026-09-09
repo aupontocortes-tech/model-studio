@@ -94,6 +94,9 @@ function previewText(text: string, max = 110) {
 
 export default function PromptsPage() {
   const [items, setItems] = useState<PromptVaultItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [areaCounts, setAreaCounts] = useState<Record<string, number>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("browse");
   const [form, setForm] = useState(EMPTY_FORM);
@@ -106,42 +109,98 @@ export default function PromptsPage() {
   const [msg, setMsg] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    const data = await api.studio.promptVault.list();
-    setItems(data.prompts);
+  const PAGE = 60;
+
+  const reloadMeta = useCallback(async () => {
+    try {
+      const data = await api.studio.promptVault.meta();
+      const map: Record<string, number> = {};
+      for (const row of data.meta.areas || []) {
+        map[row.area] = row.count;
+      }
+      setAreaCounts(map);
+      if (data.meta.warning) setMsg(data.meta.warning);
+    } catch {
+      /* meta é opcional */
+    }
   }, []);
+
+  const reload = useCallback(async () => {
+    const area = segment === TODOS ? undefined : segment;
+    const data = await api.studio.promptVault.list({
+      area,
+      q: query.trim() || undefined,
+      limit: PAGE,
+      offset: 0,
+      fields: "summary",
+    });
+    setItems(data.prompts);
+    setTotal(data.total);
+    setHasMore(data.hasMore);
+    if (data.warning) setMsg(data.warning);
+  }, [segment, query]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || busy) return;
+    setBusy(true);
+    try {
+      const area = segment === TODOS ? undefined : segment;
+      const data = await api.studio.promptVault.list({
+        area,
+        q: query.trim() || undefined,
+        limit: PAGE,
+        offset: items.length,
+        fields: "summary",
+      });
+      setItems((prev) => [...prev, ...data.prompts]);
+      setTotal(data.total);
+      setHasMore(data.hasMore);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Falha ao carregar mais.");
+    } finally {
+      setBusy(false);
+    }
+  }, [hasMore, busy, segment, query, items.length]);
 
   useEffect(() => {
     setExtraAreas(loadExtraAreas());
-  }, []);
+    void reloadMeta();
+  }, [reloadMeta]);
 
   useEffect(() => {
-    void reload().catch((e) =>
-      setError(e instanceof Error ? e.message : "Falha ao carregar prompts."),
-    );
-  }, [reload]);
+    const t = window.setTimeout(() => {
+      void reload().catch((e) =>
+        setError(e instanceof Error ? e.message : "Falha ao carregar prompts."),
+      );
+    }, query ? 250 : 0);
+    return () => window.clearTimeout(t);
+  }, [reload, query]);
 
   const segments = useMemo(() => {
+    const fromCounts = Object.keys(areaCounts);
     const fromItems = items
       .map((item) => (item.area || COMANDOS).toLowerCase())
       .filter(Boolean);
-    const set = new Set<string>([COMANDOS, ...extraAreas, ...fromItems]);
+    const set = new Set<string>([
+      COMANDOS,
+      "hooks",
+      "skills",
+      ...extraAreas,
+      ...fromCounts,
+      ...fromItems,
+    ]);
     set.delete(TODOS);
+    const preferred = [COMANDOS, "hooks", "skills"];
     const rest = [...set]
-      .filter((id) => id !== COMANDOS)
+      .filter((id) => !preferred.includes(id))
       .sort((a, b) => areaLabel(a).localeCompare(areaLabel(b), "pt-BR"));
-    return [COMANDOS, ...rest];
-  }, [items, extraAreas]);
+    return [...preferred.filter((id) => set.has(id)), ...rest];
+  }, [items, extraAreas, areaCounts]);
 
   const activeArea =
     segment === TODOS ? COMANDOS : segment || COMANDOS;
 
-  const inSegment = useMemo(() => {
-    if (segment === TODOS) return items;
-    return items.filter(
-      (item) => (item.area || COMANDOS).toLowerCase() === segment,
-    );
-  }, [items, segment]);
+  const inSegment = items;
 
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -152,15 +211,11 @@ export default function PromptsPage() {
   }, [inSegment]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
     return inSegment.filter((item) => {
       if (tagFilter && !item.tags.includes(tagFilter)) return false;
-      if (!q) return true;
-      const hay =
-        `${item.title} ${item.purpose} ${item.body} ${item.tags.join(" ")}`.toLowerCase();
-      return hay.includes(q);
+      return true;
     });
-  }, [inSegment, query, tagFilter]);
+  }, [inSegment, tagFilter]);
 
   const selected = items.find((item) => item.id === selectedId) || null;
 
@@ -204,16 +259,29 @@ export default function PromptsPage() {
     setMsg(`Segmento "${areaLabel(id)}" criado. Pode adicionar prompts nele.`);
   }
 
-  function openItem(item: PromptVaultItem) {
+  async function openItem(item: PromptVaultItem) {
     setSelectedId(item.id);
-    setForm({
-      title: item.title,
-      purpose: item.purpose,
-      body: item.body,
-      tags: item.tags.join(", "),
-    });
     setMode("open");
     clearFlash();
+    try {
+      const { prompt } = await api.studio.promptVault.get(item.id);
+      setForm({
+        title: prompt.title,
+        purpose: prompt.purpose,
+        body: prompt.body,
+        tags: prompt.tags.join(", "),
+      });
+      setItems((prev) =>
+        prev.map((row) => (row.id === prompt.id ? prompt : row)),
+      );
+    } catch {
+      setForm({
+        title: item.title,
+        purpose: item.purpose,
+        body: item.body,
+        tags: item.tags.join(", "),
+      });
+    }
     window.requestAnimationFrame(() => {
       document
         .getElementById("prompt-detail")
@@ -330,7 +398,16 @@ export default function PromptsPage() {
 
   async function copyBody(item: PromptVaultItem) {
     try {
-      await navigator.clipboard.writeText(item.body);
+      let text = item.body;
+      if (text.endsWith("…") || text.length <= 220) {
+        try {
+          const { prompt } = await api.studio.promptVault.get(item.id);
+          text = prompt.body;
+        } catch {
+          /* usa o trecho já carregado */
+        }
+      }
+      await navigator.clipboard.writeText(text);
       setCopiedId(item.id);
       setMsg(`Copiado · ${item.title}`);
       window.setTimeout(() => setCopiedId(null), 1800);
@@ -392,7 +469,7 @@ export default function PromptsPage() {
 
       <Panel
         title="Seus prompts"
-        description={`${filtered.length} prompt(s) · toque para posicionar, editar ou copiar`}
+        description={`${filtered.length} de ${total} prompt(s) · toque para posicionar, editar ou copiar`}
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative min-w-0 flex-1">
@@ -408,10 +485,13 @@ export default function PromptsPage() {
             />
           </div>
           <p className="text-xs text-[var(--muted)] sm:whitespace-nowrap">
-            {inSegment.length}
             {segment === TODOS
-              ? " no total"
-              : ` em ${areaLabel(segment)}`}
+              ? `${total} no total`
+              : `${total} em ${areaLabel(segment)}${
+                  areaCounts[segment] != null && areaCounts[segment] !== total
+                    ? ""
+                    : ""
+                }`}
           </p>
         </div>
 
@@ -603,6 +683,18 @@ export default function PromptsPage() {
             })}
           </ul>
         )}
+        {hasMore ? (
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={busy}
+              onClick={() => void loadMore()}
+            >
+              Carregar mais
+            </Button>
+          </div>
+        ) : null}
       </Panel>
 
       {mode === "open" && selected ? (

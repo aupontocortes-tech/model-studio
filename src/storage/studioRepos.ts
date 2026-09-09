@@ -35,10 +35,30 @@ async function withFileLock<T>(file: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+function isNeonQuotaOrUnavailable(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /402|quota|exceeded|data transfer/i.test(msg);
+}
+
 function makeRepo<T extends { id: string }>(file: string) {
   return {
     async all(): Promise<T[]> {
-      if (isNeonEnabled()) return neonReadCollection<T>(file);
+      if (isNeonEnabled()) {
+        try {
+          return await neonReadCollection<T>(file);
+        } catch (err) {
+          if (isNeonQuotaOrUnavailable(err)) {
+            console.warn(
+              `[studioRepos] Neon indisponível para ${file}; usando JSON local.`,
+              err instanceof Error ? err.message : err,
+            );
+            return withFileLock(file, () =>
+              readJsonFile<Collection<T>>(file, []),
+            );
+          }
+          throw err;
+        }
+      }
       return withFileLock(file, () => readJsonFile<Collection<T>>(file, []));
     },
     async get(id: string): Promise<T | undefined> {
@@ -46,12 +66,20 @@ function makeRepo<T extends { id: string }>(file: string) {
     },
     async upsert(item: T): Promise<T> {
       if (isNeonEnabled()) {
-        const items = await neonReadCollection<T>(file);
-        const idx = items.findIndex((x) => x.id === item.id);
-        if (idx >= 0) items[idx] = item;
-        else items.push(item);
-        await neonWriteCollection(file, items);
-        return item;
+        try {
+          const items = await neonReadCollection<T>(file);
+          const idx = items.findIndex((x) => x.id === item.id);
+          if (idx >= 0) items[idx] = item;
+          else items.push(item);
+          await neonWriteCollection(file, items);
+          await withFileLock(file, () => writeJsonFile(file, items));
+          return item;
+        } catch (err) {
+          if (!isNeonQuotaOrUnavailable(err)) throw err;
+          console.warn(
+            `[studioRepos] Neon indisponível ao salvar ${file}; gravando só no JSON local.`,
+          );
+        }
       }
       return withFileLock(file, async () => {
         const items = await readJsonFile<Collection<T>>(file, []);
@@ -64,12 +92,18 @@ function makeRepo<T extends { id: string }>(file: string) {
     },
     async remove(id: string): Promise<void> {
       if (isNeonEnabled()) {
-        const items = await neonReadCollection<T>(file);
-        await neonWriteCollection(
-          file,
-          items.filter((x) => x.id !== id),
-        );
-        return;
+        try {
+          const items = await neonReadCollection<T>(file);
+          const next = items.filter((x) => x.id !== id);
+          await neonWriteCollection(file, next);
+          await withFileLock(file, () => writeJsonFile(file, next));
+          return;
+        } catch (err) {
+          if (!isNeonQuotaOrUnavailable(err)) throw err;
+          console.warn(
+            `[studioRepos] Neon indisponível ao remover em ${file}; usando JSON local.`,
+          );
+        }
       }
       await withFileLock(file, async () => {
         const items = await readJsonFile<Collection<T>>(file, []);
