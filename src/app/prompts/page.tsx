@@ -119,13 +119,21 @@ export default function PromptsPage() {
         map[row.area] = row.count;
       }
       setAreaCounts(map);
-      if (data.meta.warning) setMsg(data.meta.warning);
-    } catch {
-      /* meta é opcional */
+      if (data.meta.warning) {
+        setError("");
+        setMsg(data.meta.warning);
+      }
+    } catch (e) {
+      /* meta é opcional — não duplica banner se a listagem já avisou */
+      const message = e instanceof Error ? e.message : "";
+      if (message && !message.includes("cota")) {
+        /* ignore soft meta failures */
+      }
     }
   }, []);
 
   const reload = useCallback(async () => {
+    clearFlash();
     const area = segment === TODOS ? undefined : segment;
     const data = await api.studio.promptVault.list({
       area,
@@ -137,7 +145,10 @@ export default function PromptsPage() {
     setItems(data.prompts);
     setTotal(data.total);
     setHasMore(data.hasMore);
-    if (data.warning) setMsg(data.warning);
+    if (data.warning) {
+      setError("");
+      setMsg(data.warning);
+    }
   }, [segment, query]);
 
   const loadMore = useCallback(async () => {
